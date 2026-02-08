@@ -1,0 +1,199 @@
+/* =========================
+   LAYOUT BASE (GLOBAL)
+========================= */
+
+.container {
+  max-width: 420px;
+  margin: 32px auto;
+  padding: 24px;
+  background: #111111;
+  border-radius: 10px;
+}
+
+.title {
+  margin-bottom: 20px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+/* =========================
+   LIST
+========================= */
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header-row .title {
+  margin-bottom: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-main strong {
+  font-size: 15px;
+  color: #111;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* =========================
+   INPUTS / SELECTS
+========================= */
+
+.input {
+  width: 100%;
+  padding: 10px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 4px;
+  border: 1px solid #cccccc;
+  font-size: 14px;
+}
+
+.select {
+  width: 100%;
+  padding: 10px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 4px;
+  border: 1px solid #cccccc;
+  font-size: 14px;
+}
+
+.readonly-field {
+  padding: 10px;
+  background: #1f2933;
+  color: #e5e7eb;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* =========================
+   BOTÕES
+========================= */
+
+.button {
+  width: 100%;
+  padding: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.button.secondary {
+  width: auto;
+  padding: 8px 14px;
+  background: transparent;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.button.secondary:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.button:disabled {
+  background: #555555;
+  cursor: not-allowed;
+}
+
+/* =========================
+   LINKS
+========================= */
+
+.link {
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.link.danger {
+  background: transparent;
+  border: 1px solid #dc2626;
+  color: #dc2626;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link.danger:hover {
+  background: #fee2e2;
+}
+
+/* =========================
+   MENSAGENS
+========================= */
+
+.error {
+  background: #7f1d1d;
+  color: #fee2e2;
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+
+/* =========================
+   ICONES
+========================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+  padding: 0 6px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+}
