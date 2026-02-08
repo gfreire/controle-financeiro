@@ -17,14 +17,24 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        <div className="card">
+        <Link href="/transactions" className="card">
           <div className="card-main">
-            <strong>Gastos</strong>
+            <strong>Movimentações</strong>
             <span className="muted">
-              Em breve
+                Gerenciar movimentações e despesas  
             </span>
           </div>
-        </div>
+        </Link>
+
+        <Link href="/categories" className="card">
+          <div className="card-main">
+            <strong>Categories</strong>
+            <span className="muted">
+                Gerenciar categorias e subcategorias de ENTRADA e SAÍDA
+            </span>
+          </div>
+        </Link>
+
       </div>
     </main>
   )

@@ -242,3 +242,22 @@ button.link.danger:hover {
   justify-content: flex-end;
   gap: 12px;
 }
+
+.category {
+  padding: 8px 0;
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.subcategories {
+  padding-left: 20px;
+  margin-top: 4px;
+}
+
+.subcategory {
+  color: #444;
+  font-size: 14px;
+}
