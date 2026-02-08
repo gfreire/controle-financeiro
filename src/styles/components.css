@@ -225,7 +225,7 @@ button.link.danger:hover {
 
 .modal {
   background: #ffffff;
-  color: #111111; /* 👈 AQUI ESTÁ A COR DO TEXTO */
+  color: #111111;
   padding: 20px;
   border-radius: 8px;
   max-width: 320px;

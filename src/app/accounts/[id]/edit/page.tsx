@@ -110,14 +110,9 @@ export default function EditAccountPage() {
       {account.type !== 'CARTAO_CREDITO' && (
         <div className="field">
           <label>Saldo inicial</label>
-          <input
-            className="input"
-            type="number"
-            value={initialBalance}
-            onChange={(e) =>
-              setInitialBalance(e.target.value)
-            }
-          />
+          <div className="readonly-field">
+            R$ {account.initialBalance}
+          </div>
         </div>
       )}
 
