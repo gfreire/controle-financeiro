@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  listAccounts,
-  disableAccount,
-} from '@/services/accounts.service'
+
+import { listAccounts, disableAccount } from '@/services/accounts.service'
 import { Account } from '@/domain/account'
-import {
-  accountTypeBadges,
-} from '@/utils/accountTypeUI'
+import { accountTypeBadges } from '@/utils/accountTypeUI'
 
 const accountTypeOrder: Record<string, number> = {
   DINHEIRO: 1,
@@ -21,6 +17,9 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // controla modal
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   async function loadAccounts() {
     try {
@@ -38,11 +37,12 @@ export default function AccountsPage() {
     }
   }
 
-  async function handleDisableAccount(id: string) {
-    if (!window.confirm('Deseja desativar esta conta?')) return
+  async function handleConfirmDisable() {
+    if (!confirmingId) return
 
     try {
-      await disableAccount(id)
+      await disableAccount(confirmingId)
+      setConfirmingId(null)
       await loadAccounts()
     } catch {
       alert('Erro ao desativar conta')
@@ -71,10 +71,7 @@ export default function AccountsPage() {
       <div className="header-row">
         <h1 className="title">Contas</h1>
 
-        <Link
-          href="/accounts/new"
-          className="button secondary"
-        >
+        <Link href="/accounts/new" className="button secondary">
           Nova conta
         </Link>
       </div>
@@ -99,8 +96,8 @@ export default function AccountsPage() {
 
               <span className="muted">
                 {account.type === 'CARTAO_CREDITO'
-                  ? `Limite: R$ ${account.creditLimit ?? 0}`
-                  : `Saldo: R$ ${account.initialBalance ?? 0}`}
+                  ? `Limite: R$ ${account.creditLimit}`
+                  : `Saldo: R$ ${account.initialBalance}`}
               </span>
             </div>
 
@@ -115,9 +112,7 @@ export default function AccountsPage() {
               <button
                 type="button"
                 className="link danger"
-                onClick={() =>
-                  handleDisableAccount(account.id)
-                }
+                onClick={() => setConfirmingId(account.id)}
               >
                 Desativar
               </button>
@@ -125,6 +120,31 @@ export default function AccountsPage() {
           </div>
         ))}
       </div>
+
+      {/* ===== MODAL DE CONFIRMAÇÃO ===== */}
+      {confirmingId && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <p>Deseja desativar esta conta?</p>
+
+            <div className="modal-actions">
+              <button
+                className="button secondary"
+                onClick={() => setConfirmingId(null)}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="link danger"
+                onClick={handleConfirmDisable}
+              >
+                Desativar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
