@@ -1,145 +1,84 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { listCategories } from '@/services/categories.service'
+import { Category } from '@/domain/category'
 
-import {
-  listCategoriesByType,
-  listSubcategoriesByCategory,
-  hideCategory,
-} from '@/services/categories.service'
-
-import { Category, Subcategory } from '@/domain/category'
-
-type Tab = 'ENTRADA' | 'SAIDA'
+type Tab = 'SAIDA' | 'ENTRADA'
 
 export default function CategoriesPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('SAIDA')
+  const [tab, setTab] = useState<Tab>('SAIDA')
   const [categories, setCategories] = useState<Category[]>([])
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadData(tab: Tab) {
-    try {
-      setLoading(true)
-      setError(null)
-        
-      const cats = await listCategoriesByType(tab)
-      setCategories(cats)
-
-      if (tab === 'SAIDA') {
-        const allSubs: Subcategory[] = []
-
-        for (const cat of cats) {
-          const subs = await listSubcategoriesByCategory(cat.id)
-          allSubs.push(...subs)
-        }
-
-        setSubcategories(allSubs)
-      } else {
-        setSubcategories([])
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Erro ao carregar categorias'
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleHideCategory(id: string) {
-    if (!window.confirm('Deseja ocultar esta categoria?')) return
-
-    try {
-      await hideCategory(id)
-      await loadData(activeTab)
-    } catch {
-      alert('Erro ao ocultar categoria')
-    }
-  }
-
   useEffect(() => {
-    loadData(activeTab)
-  }, [activeTab])
+    async function load() {
+      try {
+        setLoading(true)
+        const data = await listCategories(tab)
+        setCategories(data)
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Erro ao carregar categorias'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    load()
+  }, [tab])
 
   return (
     <main className="container">
-      <Link href="/" className="link">
-        ← Voltar para Dashboard
-      </Link>
-
       <h1 className="title">Categorias</h1>
 
       {/* Tabs */}
-      <div className="header-row">
+      <div className="tabs">
         <button
-          className={
-            activeTab === 'SAIDA'
-              ? 'button secondary'
-              : 'button'
-          }
-          onClick={() => setActiveTab('SAIDA')}
+          className={`tab ${tab === 'SAIDA' ? 'active' : ''}`}
+          onClick={() => setTab('SAIDA')}
         >
-          Saídas
+          Saída
         </button>
 
         <button
-          className={
-            activeTab === 'ENTRADA'
-              ? 'button secondary'
-              : 'button'
-          }
-          onClick={() => setActiveTab('ENTRADA')}
+          className={`tab ${tab === 'ENTRADA' ? 'active' : ''}`}
+          onClick={() => setTab('ENTRADA')}
         >
-          Entradas
+          Entrada
         </button>
       </div>
 
       {loading && <p className="muted">Carregando...</p>}
+
       {error && <div className="error field">{error}</div>}
 
       {!loading && categories.length === 0 && (
-        <p className="muted">Nenhuma categoria encontrada</p>
+        <p className="muted">Nenhuma categoria cadastrada</p>
       )}
 
-      {/* Árvore */}
-      <div className="list">
+      <div className="category-list">
         {categories.map((cat) => (
-          <div key={cat.id} className="category">
-            <div className="category-row">
+          <div key={cat.id} className="category-card">
+            <div className="category-header">
               <strong>{cat.nome}</strong>
 
-              <button
-                className="link danger"
-                onClick={() =>
-                  handleHideCategory(cat.id)
-                }
-              >
+              <button className="link danger">
                 Ocultar
               </button>
             </div>
 
-            {/* Subcategorias apenas para SAÍDA */}
-            {activeTab === 'SAIDA' && (
-              <div className="subcategories">
-                {subcategories
-                  .filter(
-                    (s) => s.categoria_id === cat.id
-                  )
-                  .map((sub) => (
-                    <div
-                      key={sub.id}
-                      className="subcategory"
-                    >
-                      └ {sub.nome}
-                    </div>
-                  ))}
-              </div>
-            )}
+            {cat.subcategorias?.length ? (
+              <ul className="subcategory-list">
+                {cat.subcategorias.map((sub) => (
+                  <li key={sub.id}>{sub.nome}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ))}
       </div>

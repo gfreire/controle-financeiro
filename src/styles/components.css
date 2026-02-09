@@ -243,21 +243,71 @@ button.link.danger:hover {
   gap: 12px;
 }
 
-.category {
-  padding: 8px 0;
+/* =========================
+   TABS
+========================= */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
-.category-row {
+.tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+/* =========================
+   CATEGORY LIST
+========================= */
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.category-card {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.category-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 
-.subcategories {
-  padding-left: 20px;
-  margin-top: 4px;
+.category-header strong {
+  font-size: 15px;
+  color: #111;
 }
 
-.subcategory {
-  color: #444;
+/* =========================
+   SUBCATEGORIES
+========================= */
+
+.subcategory-list {
+  margin-top: 8px;
+  padding-left: 16px;
+}
+
+.subcategory-list li {
   font-size: 14px;
+  color: #374151;
+  margin-bottom: 4px;
 }
