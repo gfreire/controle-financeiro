@@ -27,11 +27,8 @@ export default function AccountsPage() {
       const data = await listAccounts()
       setAccounts(data)
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Erro ao carregar contas'
-      )
+      console.error(err)
+      setError('Erro ao carregar contas')
     } finally {
       setLoading(false)
     }
@@ -80,7 +77,9 @@ export default function AccountsPage() {
       {error && <div className="error field">{error}</div>}
 
       {!loading && sortedAccounts.length === 0 && (
-        <p className="muted">Nenhuma conta cadastrada</p>
+        <div className="empty-state">
+          Nenhuma conta cadastrada
+        </div>
       )}
 
       <div className="list">
