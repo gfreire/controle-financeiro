@@ -1,3 +1,5 @@
+// src/domain/account.ts
+
 export type AccountType =
   | 'DINHEIRO'
   | 'CONTA_CORRENTE'
@@ -15,10 +17,22 @@ export type Account = {
   createdAt: string
 }
 
+/**
+ * Input para criação de conta
+ */
 export type CreateAccountInput = {
   name: string
   type: AccountType
   initialBalance?: number | null
+  creditLimit?: number | null
+}
+
+/**
+ * Input para edição de conta
+ * (tipo e saldo inicial NÃO podem ser alterados)
+ */
+export type UpdateAccountInput = {
+  name: string
   creditLimit?: number | null
 }
 
@@ -52,14 +66,16 @@ export function validateCreateAccount(
         'Cartão de crédito não pode ter saldo inicial'
       )
     }
-  } else {
+  }
+
+  if (input.type !== 'CARTAO_CREDITO') {
     if (
       input.initialBalance === null ||
       input.initialBalance === undefined ||
       input.initialBalance < 0
     ) {
       throw new Error(
-        'Saldo inicial deve ser zero ou maior'
+        'Saldo inicial deve ser zero ou positivo'
       )
     }
 
@@ -68,28 +84,22 @@ export function validateCreateAccount(
       input.creditLimit !== undefined
     ) {
       throw new Error(
-        'Somente cartão pode ter limite'
+        'Somente cartão de crédito pode ter limite'
       )
     }
   }
 }
 
 export function validateUpdateAccount(
-  input: Partial<CreateAccountInput>
+  input: UpdateAccountInput
 ): void {
-  if (
-    input.initialBalance !== undefined &&
-    input.initialBalance !== null &&
-    input.initialBalance < 0
-  ) {
-    throw new Error(
-      'Saldo não pode ser negativo'
-    )
+  if (!input.name || input.name.trim().length < 2) {
+    throw new Error('Nome da conta é obrigatório')
   }
 
   if (
-    input.creditLimit !== undefined &&
     input.creditLimit !== null &&
+    input.creditLimit !== undefined &&
     input.creditLimit <= 0
   ) {
     throw new Error(

@@ -151,6 +151,11 @@
   cursor: not-allowed;
 }
 
+.button.danger {
+  background: #dc2626;
+  color: #fff;
+}
+
 /* =========================
    LINKS / AÇÕES
 ========================= */
@@ -235,16 +240,20 @@ button.link.danger:hover {
 
 .modal {
   background: #ffffff;
-  color: #111111;
+  color: #111;
   padding: 20px;
   border-radius: 8px;
-  max-width: 320px;
   width: 100%;
+  max-width: 360px;
 }
 
-.modal p {
-  margin-bottom: 16px;
+.modal-title {
+  margin-bottom: 10px;
+}
+
+.modal-text {
   font-size: 14px;
+  margin-bottom: 20px;
 }
 
 .modal-actions {

@@ -1,57 +1,37 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { supabaseServer } from '@/lib/supabaseServer'
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
+  const supabase = await supabaseServer() // 👈 AQUI ESTAVA O ERRO
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
-  const isLoginPage = pathname.startsWith('/login')
+  const isAuthRoute = req.nextUrl.pathname.startsWith('/login')
 
-  // 🔒 Não autenticado → login
-  if (!user && !isLoginPage) {
+  // ❌ Não logado tentando acessar app
+  if (!user && !isAuthRoute) {
     return NextResponse.redirect(
-      new URL('/login', request.url)
+      new URL('/login', req.url)
     )
   }
 
-  // ✅ Autenticado → fora do login
-  if (user && isLoginPage) {
+  // ✅ Logado tentando acessar login
+  if (user && isAuthRoute) {
     return NextResponse.redirect(
-      new URL('/', request.url)
+      new URL('/', req.url)
     )
   }
 
-  return response
+  return res
 }
 
 export const config = {
   matcher: [
-    '/',
-    '/accounts/:path*',
-    '/categories/:path*',
-    '/transactions/:path*',
-    '/login',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

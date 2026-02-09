@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-
 import { listAccounts, disableAccount } from '@/services/accounts.service'
 import { Account } from '@/domain/account'
 import { accountTypeBadges } from '@/utils/accountTypeUI'
@@ -18,8 +17,10 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // controla modal
-  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  // modal
+  const [accountToDisable, setAccountToDisable] =
+    useState<Account | null>(null)
+  const [disabling, setDisabling] = useState(false)
 
   async function loadAccounts() {
     try {
@@ -27,22 +28,28 @@ export default function AccountsPage() {
       const data = await listAccounts()
       setAccounts(data)
     } catch (err) {
-      console.error(err)
-      setError('Erro ao carregar contas')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Erro ao carregar contas'
+      )
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleConfirmDisable() {
-    if (!confirmingId) return
+  async function confirmDisable() {
+    if (!accountToDisable) return
 
     try {
-      await disableAccount(confirmingId)
-      setConfirmingId(null)
+      setDisabling(true)
+      await disableAccount(accountToDisable.id)
+      setAccountToDisable(null)
       await loadAccounts()
     } catch {
       alert('Erro ao desativar conta')
+    } finally {
+      setDisabling(false)
     }
   }
 
@@ -68,18 +75,24 @@ export default function AccountsPage() {
       <div className="header-row">
         <h1 className="title">Contas</h1>
 
-        <Link href="/accounts/new" className="button secondary">
+        <Link
+          href="/accounts/new"
+          className="button secondary"
+        >
           Nova conta
         </Link>
       </div>
 
       {loading && <p className="muted">Carregando...</p>}
-      {error && <div className="error field">{error}</div>}
+
+      {error && (
+        <div className="error field">{error}</div>
+      )}
 
       {!loading && sortedAccounts.length === 0 && (
-        <div className="empty-state">
+        <p className="muted">
           Nenhuma conta cadastrada
-        </div>
+        </p>
       )}
 
       <div className="list">
@@ -111,7 +124,9 @@ export default function AccountsPage() {
               <button
                 type="button"
                 className="link danger"
-                onClick={() => setConfirmingId(account.id)}
+                onClick={() =>
+                  setAccountToDisable(account)
+                }
               >
                 Desativar
               </button>
@@ -120,25 +135,43 @@ export default function AccountsPage() {
         ))}
       </div>
 
-      {/* ===== MODAL DE CONFIRMAÇÃO ===== */}
-      {confirmingId && (
+      {/* =========================
+          MODAL DE CONFIRMAÇÃO
+         ========================= */}
+      {accountToDisable && (
         <div className="modal-overlay">
           <div className="modal">
-            <p>Deseja desativar esta conta?</p>
+            <h3 className="modal-title">
+              Desativar conta
+            </h3>
+
+            <p className="modal-text">
+              Tem certeza que deseja desativar a conta{' '}
+              <strong>
+                {accountToDisable.name}
+              </strong>
+              ?
+            </p>
 
             <div className="modal-actions">
               <button
                 className="button secondary"
-                onClick={() => setConfirmingId(null)}
+                onClick={() =>
+                  setAccountToDisable(null)
+                }
+                disabled={disabling}
               >
                 Cancelar
               </button>
 
               <button
-                className="link danger"
-                onClick={handleConfirmDisable}
+                className="button danger"
+                onClick={confirmDisable}
+                disabled={disabling}
               >
-                Desativar
+                {disabling
+                  ? 'Desativando...'
+                  : 'Desativar'}
               </button>
             </div>
           </div>

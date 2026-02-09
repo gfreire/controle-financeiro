@@ -3,18 +3,19 @@ import {
   Account,
   AccountType,
   CreateAccountInput,
+  UpdateAccountInput,
   validateCreateAccount,
   validateUpdateAccount,
 } from '@/domain/account'
 
 /* =========================
-   DB TYPE
+   INTERNAL DB TYPE
 ========================= */
 
-type DbAccountRow = {
+type DBAccount = {
   id: string
   nome: string
-  tipo_conta: string
+  tipo_conta: AccountType
   saldo_inicial: number | null
   limite_total: number | null
   ativa: boolean
@@ -22,16 +23,31 @@ type DbAccountRow = {
 }
 
 /* =========================
+   USER CONTEXT
+========================= */
+
+async function getUserId(): Promise<string> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  return user.id
+}
+
+/* =========================
    MAPPER
 ========================= */
 
-function mapDbAccountToDomain(
-  row: DbAccountRow
-): Account {
+function mapDbAccountToDomain(row: DBAccount): Account {
   return {
     id: row.id,
     name: row.nome,
-    type: row.tipo_conta as AccountType,
+    type: row.tipo_conta,
     initialBalance: row.saldo_inicial,
     creditLimit: row.limite_total,
     active: row.ativa,
@@ -40,7 +56,7 @@ function mapDbAccountToDomain(
 }
 
 /* =========================
-   LIST
+   SERVICES
 ========================= */
 
 export async function listAccounts(): Promise<Account[]> {
@@ -48,19 +64,14 @@ export async function listAccounts(): Promise<Account[]> {
     .from('contas')
     .select('*')
     .eq('ativa', true)
+    .order('nome')
 
   if (error) {
-    throw new Error('Erro ao carregar contas')
+    throw new Error(error.message)
   }
 
-  return (data as DbAccountRow[]).map(
-    mapDbAccountToDomain
-  )
+  return (data ?? []).map(mapDbAccountToDomain)
 }
-
-/* =========================
-   GET BY ID
-========================= */
 
 export async function getAccountById(
   id: string
@@ -75,88 +86,76 @@ export async function getAccountById(
     throw new Error('Conta não encontrada')
   }
 
-  return mapDbAccountToDomain(
-    data as DbAccountRow
-  )
+  return mapDbAccountToDomain(data)
 }
-
-/* =========================
-   CREATE
-========================= */
 
 export async function createAccount(
   input: CreateAccountInput
 ): Promise<void> {
   validateCreateAccount(input)
 
+  const userId = await getUserId()
+
+  const { name, type, initialBalance, creditLimit } =
+    input
+
   const { error } = await supabase
     .from('contas')
     .insert({
-      nome: input.name,
-      tipo_conta: input.type,
+      nome: name,
+      tipo_conta: type,
       saldo_inicial:
-        input.type === 'CARTAO_CREDITO'
+        type === 'CARTAO_CREDITO'
           ? null
-          : input.initialBalance ?? 0,
+          : initialBalance ?? 0,
       limite_total:
-        input.type === 'CARTAO_CREDITO'
-          ? input.creditLimit
+        type === 'CARTAO_CREDITO'
+          ? creditLimit!
           : null,
-      ativa: true,
+      user_id: userId,
     })
 
   if (error) {
-    throw new Error('Erro ao criar conta')
+    throw new Error(error.message)
   }
 }
-
-/* =========================
-   UPDATE
-========================= */
 
 export async function updateAccount(
   id: string,
-  input: Partial<CreateAccountInput>
+  input: UpdateAccountInput
 ): Promise<void> {
   validateUpdateAccount(input)
 
-  const payload: Partial<DbAccountRow> = {}
+  const userId = await getUserId()
 
-  if (input.name !== undefined) {
-    payload.nome = input.name
-  }
-
-  if (input.initialBalance !== undefined) {
-    payload.saldo_inicial = input.initialBalance
-  }
-
-  if (input.creditLimit !== undefined) {
-    payload.limite_total = input.creditLimit
-  }
+  const { name, creditLimit } = input
 
   const { error } = await supabase
     .from('contas')
-    .update(payload)
+    .update({
+      nome: name,
+      limite_total: creditLimit ?? null,
+    })
     .eq('id', id)
+    .eq('user_id', userId)
 
   if (error) {
-    throw new Error('Erro ao atualizar conta')
+    throw new Error(error.message)
   }
 }
-
-/* =========================
-   DISABLE (LOGICAL DELETE)
-========================= */
 
 export async function disableAccount(
   id: string
 ): Promise<void> {
+  const userId = await getUserId()
+
   const { error } = await supabase
     .from('contas')
     .update({ ativa: false })
     .eq('id', id)
+    .eq('user_id', userId)
 
   if (error) {
-    throw new Error('Erro ao desativar conta')
+    throw new Error(error.message)
   }
 }
