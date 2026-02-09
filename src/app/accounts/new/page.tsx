@@ -68,21 +68,23 @@ export default function NewAccountPage() {
 
       <div className="field">
         <label>Tipo</label>
-        <select
-          className="select"
-          value={type}
-          onChange={(e) =>
-            setType(e.target.value as AccountType)
-          }
-        >
-          {Object.entries(accountTypeLabels).map(
-            ([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            )
-          )}
-        </select>
+        <div className="field select-wrapper">
+          <select
+            className="select"
+            value={type}
+            onChange={(e) =>
+              setType(e.target.value as AccountType)
+            }
+          >
+            {Object.entries(accountTypeLabels).map(
+              ([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              )
+            )}
+          </select>
+        </div>
       </div>
 
       {type !== 'CARTAO_CREDITO' && (

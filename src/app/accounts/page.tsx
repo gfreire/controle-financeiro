@@ -90,9 +90,10 @@ export default function AccountsPage() {
       )}
 
       {!loading && sortedAccounts.length === 0 && (
-        <p className="muted">
-          Nenhuma conta cadastrada
-        </p>
+        <div className="empty-state">
+          <strong>Nenhuma conta cadastrada</strong>
+          <span>Crie sua primeira conta para começar</span>
+        </div>
       )}
 
       <div className="list">
