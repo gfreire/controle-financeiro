@@ -90,26 +90,27 @@ SET default_table_access_method = "heap";
 CREATE TABLE IF NOT EXISTS "public"."categorias" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "nome" "text" NOT NULL,
-    "ativa" boolean DEFAULT true,
     "user_id" "uuid",
-    "tipo_categoria" "extensions"."tipo_categoria_enum" DEFAULT 'SAIDA'::"extensions"."tipo_categoria_enum" NOT NULL,
-    "is_default" boolean DEFAULT false NOT NULL
+    "tipo_categoria" "extensions"."tipo_categoria_enum" DEFAULT 'SAIDA'::"extensions"."tipo_categoria_enum" NOT NULL
 );
 
 
 ALTER TABLE "public"."categorias" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."categorias"."ativa" IS 'Se false, categoria fica oculta para o usuário, histórico permanece';
-
-
-
 COMMENT ON COLUMN "public"."categorias"."tipo_categoria" IS 'Define se a categoria é usada para ENTRADA ou SAIDA';
 
 
 
-COMMENT ON COLUMN "public"."categorias"."is_default" IS 'Categoria criada pelo sistema, pode ser ocultada pelo usuário';
+CREATE TABLE IF NOT EXISTS "public"."categorias_ocultas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "categoria_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp without time zone DEFAULT "now"()
+);
 
+
+ALTER TABLE "public"."categorias_ocultas" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."compras_cartao" (
@@ -216,7 +217,6 @@ CREATE TABLE IF NOT EXISTS "public"."subcategorias" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "categoria_id" "uuid" NOT NULL,
     "nome" "text" NOT NULL,
-    "ativa" boolean DEFAULT true,
     "user_id" "uuid"
 );
 
@@ -229,6 +229,27 @@ COMMENT ON TABLE "public"."subcategorias" IS 'Subcategorias são usadas apenas p
 
 
 COMMENT ON COLUMN "public"."subcategorias"."categoria_id" IS 'Deve referenciar apenas categorias do tipo SAIDA (regra de aplicação)';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."subcategorias_ocultas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "subcategoria_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "created_at" timestamp without time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."subcategorias_ocultas" OWNER TO "postgres";
+
+
+ALTER TABLE ONLY "public"."categorias_ocultas"
+    ADD CONSTRAINT "categorias_ocultas_categoria_id_user_id_key" UNIQUE ("categoria_id", "user_id");
+
+
+
+ALTER TABLE ONLY "public"."categorias_ocultas"
+    ADD CONSTRAINT "categorias_ocultas_pkey" PRIMARY KEY ("id");
 
 
 
@@ -267,12 +288,27 @@ ALTER TABLE ONLY "public"."parcelas_cartao"
 
 
 
+ALTER TABLE ONLY "public"."subcategorias_ocultas"
+    ADD CONSTRAINT "subcategorias_ocultas_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."subcategorias_ocultas"
+    ADD CONSTRAINT "subcategorias_ocultas_subcategoria_id_user_id_key" UNIQUE ("subcategoria_id", "user_id");
+
+
+
 ALTER TABLE ONLY "public"."subcategorias"
     ADD CONSTRAINT "subcategorias_pkey" PRIMARY KEY ("id");
 
 
 
 CREATE UNIQUE INDEX "categorias_nome_tipo_unique" ON "public"."categorias" USING "btree" ("nome", "tipo_categoria");
+
+
+
+ALTER TABLE ONLY "public"."categorias_ocultas"
+    ADD CONSTRAINT "categorias_ocultas_categoria_id_fkey" FOREIGN KEY ("categoria_id") REFERENCES "public"."categorias"("id") ON DELETE CASCADE;
 
 
 
@@ -326,7 +362,102 @@ ALTER TABLE ONLY "public"."subcategorias"
 
 
 
-CREATE POLICY "Allow read categories" ON "public"."categorias" FOR SELECT USING (true);
+ALTER TABLE ONLY "public"."subcategorias_ocultas"
+    ADD CONSTRAINT "subcategorias_ocultas_subcategoria_id_fkey" FOREIGN KEY ("subcategoria_id") REFERENCES "public"."subcategorias"("id") ON DELETE CASCADE;
+
+
+
+CREATE POLICY "User sees own and default categories" ON "public"."categorias" FOR SELECT USING ((("user_id" = "auth"."uid"()) OR ("user_id" IS NULL)));
+
+
+
+ALTER TABLE "public"."categorias" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."categorias_ocultas" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."compras_cartao" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."contas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "delete_user_categories" ON "public"."categorias" FOR DELETE USING (("user_id" = "auth"."uid"()));
+
+
+
+ALTER TABLE "public"."dividas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "insert_user_categories" ON "public"."categorias" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+ALTER TABLE "public"."movimentacoes" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."movimentos_divida" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."parcelas_cartao" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."subcategorias" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."subcategorias_ocultas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "update_user_categories" ON "public"."categorias" FOR UPDATE USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_delete_own_accounts" ON "public"."contas" FOR DELETE USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_insert_own_accounts" ON "public"."contas" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_hidden_categories" ON "public"."categorias_ocultas" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_hidden_subcategories" ON "public"."subcategorias_ocultas" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_card_installments" ON "public"."parcelas_cartao" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_card_purchases" ON "public"."compras_cartao" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_debt_movements" ON "public"."movimentos_divida" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_debts" ON "public"."dividas" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_movements" ON "public"."movimentacoes" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_manage_own_subcategories" ON "public"."subcategorias" USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_select_own_accounts" ON "public"."contas" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "user_update_own_accounts" ON "public"."contas" FOR UPDATE USING (("user_id" = "auth"."uid"())) WITH CHECK (("user_id" = "auth"."uid"()));
 
 
 
@@ -505,18 +636,8 @@ GRANT ALL ON SCHEMA "public" TO PUBLIC;
 
 
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."categorias" TO "anon";
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."categorias" TO "authenticated";
-
-
-
-GRANT ALL ON TABLE "public"."contas" TO "anon";
-GRANT ALL ON TABLE "public"."contas" TO "authenticated";
-
-
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."subcategorias" TO "anon";
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."subcategorias" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."contas" TO "anon";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."contas" TO "authenticated";
 
 
 
