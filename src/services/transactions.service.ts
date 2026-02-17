@@ -111,7 +111,10 @@ async function createTransfer(
 ========================= */
 
 async function createCardPurchase(
-  input: Extract<CreateTransactionInput, { type: 'SAIDA' }>
+  input: Extract<
+    CreateTransactionInput,
+    { type: 'SAIDA'; paymentMethod: 'CARTAO_CREDITO' }
+  >
 ) {
   const { data: userData } = await supabase.auth.getUser()
   const userId = userData.user?.id
@@ -126,8 +129,35 @@ async function createCardPurchase(
     subcategoryId,
     installments,
     firstInstallmentMonth,
+    parcelValues,
   } = input
 
+  if (!installments || installments < 1) {
+    throw new Error('Número de parcelas inválido')
+  }
+
+  if (!firstInstallmentMonth) {
+    throw new Error('Mês da primeira parcela obrigatório')
+  }
+
+  if (!parcelValues || parcelValues.length !== installments) {
+    throw new Error('Parcelas inválidas')
+  }
+
+  const totalFromParcels = parcelValues.reduce(
+    (sum, v) => sum + v,
+    0
+  )
+
+  const diff = Math.abs(totalFromParcels - amount)
+
+  if (diff > 0.01) {
+    throw new Error(
+      'Soma das parcelas diferente do valor total'
+    )
+  }
+
+  /* 1️⃣ Cria registro principal da compra */
   const { data: purchase, error: purchaseError } =
     await supabase
       .from('compras_cartao')
@@ -148,17 +178,12 @@ async function createCardPurchase(
     throw new Error('Erro ao criar compra no cartão')
   }
 
-  const installmentValue = Number(
-    (amount / (installments ?? 1)).toFixed(2)
-  )
-
-  const [year, month] = firstInstallmentMonth!
+  /* 2️⃣ Gera parcelas usando valores vindos do FORM */
+  const [year, month] = firstInstallmentMonth
     .split('-')
     .map(Number)
 
-  const parcels = Array.from({
-    length: installments ?? 1,
-  }).map((_, index) => {
+  const parcels = parcelValues.map((value, index) => {
     const competence = new Date(
       year,
       month - 1 + index,
@@ -172,7 +197,7 @@ async function createCardPurchase(
     return {
       compra_cartao_id: purchase.id,
       competencia: formatted,
-      valor: installmentValue,
+      valor: value,
       user_id: userId,
     }
   })

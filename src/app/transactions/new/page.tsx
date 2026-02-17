@@ -54,8 +54,11 @@ export default function NewTransactionPage() {
       ).padStart(2, '0')}`
     })
 
-  const [parcelOverrides, setParcelOverrides] =
-    useState<Record<number, { value: string }>>({})
+  const [parcelValues, setParcelValues] = useState<number[]>([])
+  const [lastBaseConfig, setLastBaseConfig] = useState<{
+    amount: string
+    installments: string
+  }>({ amount: '', installments: '' })
 
   const filteredAccounts = useMemo(() => {
     if (!paymentMethod) return []
@@ -73,53 +76,62 @@ export default function NewTransactionPage() {
   const parcels = useMemo<Parcel[]>(() => {
     if (paymentMethod !== 'CARTAO_CREDITO') return []
 
-    const total = Number(amount)
     const qty = Number(installments)
+    if (!qty || qty <= 0) return []
 
-    if (!total || !qty || qty <= 0) return []
-
-    const baseValue = +(total / qty).toFixed(2)
     const [year, month] = firstInstallmentMonth
       .split('-')
       .map(Number)
 
-    const next: Parcel[] = []
-
-    for (let i = 0; i < qty; i++) {
-      const d = new Date(year, month - 1 + i, 1)
+    return parcelValues.map((value, index) => {
+      const d = new Date(year, month - 1 + index, 1)
 
       const ym = `${d.getFullYear()}-${String(
         d.getMonth() + 1
       ).padStart(2, '0')}`
 
-      const override = parcelOverrides[i]
-
-      next.push({
+      return {
         month: ym,
-        value: override
-          ? override.value
-          : baseValue.toFixed(2),
-        edited: Boolean(override),
-      })
+        value: value.toFixed(2),
+        edited: true,
+      }
+    })
+  }, [parcelValues, installments, firstInstallmentMonth, paymentMethod])
+
+  function updateParcelValue(index: number, value: string) {
+    const numeric = Number(value)
+    if (isNaN(numeric)) return
+
+    setParcelValues((prev) => {
+      const next = [...prev]
+      next[index] = numeric
+      return next
+    })
+  }
+
+  function regenerateParcels(
+    totalStr: string,
+    qtyStr: string
+  ) {
+    const total = Number(totalStr)
+    const qty = Number(qtyStr)
+
+    if (!total || !qty || qty <= 0) {
+      setParcelValues([])
+      return
     }
 
-    return next
-  }, [
-    amount,
-    installments,
-    firstInstallmentMonth,
-    paymentMethod,
-    parcelOverrides,
-  ])
+    const totalCents = Math.round(total * 100)
+    const base = Math.floor(totalCents / qty)
+    const remainder = totalCents - base * qty
 
-  function updateParcelValue(
-    index: number,
-    value: string
-  ) {
-    setParcelOverrides((prev) => ({
-      ...prev,
-      [index]: { value },
-    }))
+    const next = Array.from({ length: qty }).map((_, i) => {
+      const cents = i === 0 ? base + remainder : base
+      return cents / 100
+    })
+
+    setParcelValues(next)
+    setLastBaseConfig({ amount: totalStr, installments: qtyStr })
   }
 
   async function handleSubmit(
@@ -142,28 +154,38 @@ export default function NewTransactionPage() {
     }
 
     if (kind === 'SAIDA') {
-      await createTransaction({
-        type: 'SAIDA',
-        date,
-        amount: Number(amount),
-        description,
-        originAccountId: accountId,
-        paymentMethod,
-        categoryId: category || null,
-        subcategoryId: subcategory || null,
-        installments:
-          paymentMethod === 'CARTAO_CREDITO'
-            ? Number(installments)
-            : undefined,
-        firstInstallmentMonth:
-          paymentMethod === 'CARTAO_CREDITO'
-            ? firstInstallmentMonth
-            : undefined,
-      })
+      if (paymentMethod === 'CARTAO_CREDITO') {
+        await createTransaction({
+          type: 'SAIDA',
+          date,
+          amount: Number(amount),
+          description,
+          originAccountId: accountId,
+          paymentMethod: 'CARTAO_CREDITO',
+          categoryId: category || null,
+          subcategoryId: subcategory || null,
+          installments: Number(installments),
+          firstInstallmentMonth,
+          parcelValues,
+        })
+      } else {
+        await createTransaction({
+          type: 'SAIDA',
+          date,
+          amount: Number(amount),
+          description,
+          originAccountId: accountId,
+          paymentMethod: paymentMethod as 'DINHEIRO' | 'CONTA_CORRENTE',
+          categoryId: category || null,
+          subcategoryId: subcategory || null,
+        })
+      }
     }
 
     setDescription('')
     setAmount('')
+    setParcelValues([])
+    setLastBaseConfig({ amount: '', installments: '' })
   }
 
   return (
@@ -218,12 +240,15 @@ export default function NewTransactionPage() {
           <select
             className="select"
             value={paymentMethod}
-            onChange={(e) =>
-              setPaymentMethod(
-                e.target
-                  .value as PaymentMethod
-              )
-            }
+            onChange={(e) => {
+              const next = e.target.value as PaymentMethod
+              setPaymentMethod(next)
+
+              if (next !== 'CARTAO_CREDITO') {
+                setParcelValues([])
+                setLastBaseConfig({ amount: '', installments: '' })
+              }
+            }}
           >
             <option value="">
               Selecione
@@ -353,11 +378,14 @@ export default function NewTransactionPage() {
             className="input"
             type="number"
             value={amount}
-            onChange={(e) =>
-              setAmount(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+              const nextAmount = e.target.value
+              setAmount(nextAmount)
+
+              if (paymentMethod === 'CARTAO_CREDITO') {
+                regenerateParcels(nextAmount, installments)
+              }
+            }}
           />
         </div>
 
@@ -373,11 +401,14 @@ export default function NewTransactionPage() {
                 type="number"
                 min={1}
                 value={installments}
-                onChange={(e) =>
-                  setInstallments(
-                    e.target.value
-                  )
-                }
+                onChange={(e) => {
+                  const nextInstallments = e.target.value
+                  setInstallments(nextInstallments)
+
+                  if (paymentMethod === 'CARTAO_CREDITO') {
+                    regenerateParcels(amount, nextInstallments)
+                  }
+                }}
               />
             </div>
 

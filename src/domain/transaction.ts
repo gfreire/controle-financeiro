@@ -52,14 +52,20 @@ export type CreateIncomeInput = BaseInput & {
   destinationAccountId: string
 }
 
-export type CreateExpenseInput = BaseInput & {
-  type: 'SAIDA'
-  paymentMethod: PaymentMethod
-  originAccountId: string
-
-  installments?: number
-  firstInstallmentMonth?: string
-}
+export type CreateExpenseInput =
+  | (BaseInput & {
+      type: 'SAIDA'
+      paymentMethod: 'DINHEIRO' | 'CONTA_CORRENTE'
+      originAccountId: string
+    })
+  | (BaseInput & {
+      type: 'SAIDA'
+      paymentMethod: 'CARTAO_CREDITO'
+      originAccountId: string
+      installments: number
+      firstInstallmentMonth: string
+      parcelValues: number[]
+    })
 
 export type CreateTransferInput = BaseInput & {
   type: 'TRANSFERENCIA'
@@ -104,6 +110,13 @@ export function validateCreateTransaction(
 
       if (!input.firstInstallmentMonth) {
         throw new Error('Mês da primeira parcela é obrigatório')
+      }
+
+      if (
+        !Array.isArray(input.parcelValues) ||
+        input.parcelValues.length !== input.installments
+      ) {
+        throw new Error('Parcelas inconsistentes')
       }
     }
   }
