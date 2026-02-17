@@ -54,7 +54,7 @@ export default function NewTransactionPage() {
       ).padStart(2, '0')}`
     })
 
-  const [parcelValues, setParcelValues] = useState<number[]>([])
+  const [parcelValues, setParcelValues] = useState<string[]>([])
 
   const filteredAccounts = useMemo(() => {
     if (!paymentMethod) return []
@@ -88,19 +88,26 @@ export default function NewTransactionPage() {
 
       return {
         month: ym,
-        value: value.toFixed(2),
+        value,
         edited: true,
       }
     })
   }, [parcelValues, installments, firstInstallmentMonth, paymentMethod])
 
   function updateParcelValue(index: number, value: string) {
-    const numeric = Number(value)
-    if (isNaN(numeric)) return
-
     setParcelValues((prev) => {
       const next = [...prev]
-      next[index] = numeric
+      next[index] = value
+
+      // recalcula total baseado nas parcelas editadas
+      const total = next.reduce((acc, v) => {
+        const num = Number(v)
+        return acc + (isNaN(num) ? 0 : num)
+      }, 0)
+
+      // atualiza o valor total para refletir as parcelas
+      setAmount(total ? total.toFixed(2) : '')
+
       return next
     })
   }
@@ -123,7 +130,7 @@ export default function NewTransactionPage() {
 
     const next = Array.from({ length: qty }).map((_, i) => {
       const cents = i === 0 ? base + remainder : base
-      return cents / 100
+      return (cents / 100).toFixed(2)
     })
 
     setParcelValues(next)
@@ -161,7 +168,7 @@ export default function NewTransactionPage() {
           subcategoryId: subcategory || null,
           installments: Number(installments),
           firstInstallmentMonth,
-          parcelValues,
+          parcelValues: parcelValues.map((v) => Number(v)),
         })
       } else {
         await createTransaction({
