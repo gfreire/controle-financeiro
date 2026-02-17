@@ -152,17 +152,26 @@ async function createCardPurchase(
     (amount / (installments ?? 1)).toFixed(2)
   )
 
-  const baseDate = new Date(firstInstallmentMonth!)
+  const [year, month] = firstInstallmentMonth!
+    .split('-')
+    .map(Number)
 
   const parcels = Array.from({
     length: installments ?? 1,
   }).map((_, index) => {
-    const competence = new Date(baseDate)
-    competence.setMonth(baseDate.getMonth() + index)
+    const competence = new Date(
+      year,
+      month - 1 + index,
+      1
+    )
+
+    const formatted = `${competence.getFullYear()}-${String(
+      competence.getMonth() + 1
+    ).padStart(2, '0')}-01`
 
     return {
       compra_cartao_id: purchase.id,
-      competencia: competence.toISOString().slice(0, 10),
+      competencia: formatted,
       valor: installmentValue,
       user_id: userId,
     }

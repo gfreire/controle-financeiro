@@ -14,6 +14,12 @@ type PaymentMethod =
   | 'CONTA_CORRENTE'
   | 'CARTAO_CREDITO'
 
+type Parcel = {
+  month: string
+  value: string
+  edited?: boolean
+}
+
 export default function NewTransactionPage() {
   const today = new Date().toISOString().slice(0, 10)
 
@@ -48,6 +54,9 @@ export default function NewTransactionPage() {
       ).padStart(2, '0')}`
     })
 
+  const [parcelOverrides, setParcelOverrides] =
+    useState<Record<number, { value: string }>>({})
+
   const filteredAccounts = useMemo(() => {
     if (!paymentMethod) return []
     return accounts.filter((a) => {
@@ -60,6 +69,58 @@ export default function NewTransactionPage() {
       return false
     })
   }, [accounts, paymentMethod])
+
+  const parcels = useMemo<Parcel[]>(() => {
+    if (paymentMethod !== 'CARTAO_CREDITO') return []
+
+    const total = Number(amount)
+    const qty = Number(installments)
+
+    if (!total || !qty || qty <= 0) return []
+
+    const baseValue = +(total / qty).toFixed(2)
+    const [year, month] = firstInstallmentMonth
+      .split('-')
+      .map(Number)
+
+    const next: Parcel[] = []
+
+    for (let i = 0; i < qty; i++) {
+      const d = new Date(year, month - 1 + i, 1)
+
+      const ym = `${d.getFullYear()}-${String(
+        d.getMonth() + 1
+      ).padStart(2, '0')}`
+
+      const override = parcelOverrides[i]
+
+      next.push({
+        month: ym,
+        value: override
+          ? override.value
+          : baseValue.toFixed(2),
+        edited: Boolean(override),
+      })
+    }
+
+    return next
+  }, [
+    amount,
+    installments,
+    firstInstallmentMonth,
+    paymentMethod,
+    parcelOverrides,
+  ])
+
+  function updateParcelValue(
+    index: number,
+    value: string
+  ) {
+    setParcelOverrides((prev) => ({
+      ...prev,
+      [index]: { value },
+    }))
+  }
 
   async function handleSubmit(
     e: React.FormEvent
@@ -338,6 +399,32 @@ export default function NewTransactionPage() {
                 }
               />
             </div>
+
+            {parcels.length > 0 && (
+              <div className="field">
+                <label>Parcelas</label>
+
+                {parcels.map((p, i) => (
+                  <div key={i} className="parcel-row">
+                    <div className="readonly-field">
+                      {p.month}
+                    </div>
+
+                    <input
+                      className="input"
+                      type="number"
+                      value={p.value}
+                      onChange={(e) =>
+                        updateParcelValue(
+                          i,
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
