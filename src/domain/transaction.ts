@@ -3,46 +3,74 @@ export type TransactionType =
   | 'SAIDA'
   | 'TRANSFERENCIA'
 
+export type PaymentMethod =
+  | 'DINHEIRO'
+  | 'CONTA_CORRENTE'
+  | 'CARTAO_CREDITO'
+
+/* =========================
+   BASE TRANSACTION (DOMAIN)
+========================= */
+
 export type Transaction = {
   id: string
   type: TransactionType
 
-  // Contas
   originAccountId: string | null
   destinationAccountId: string | null
 
-  // Valor e dados
   amount: number
   description: string | null
   date: string
 
-  // Categoria (opcional)
   categoryId: string | null
   subcategoryId: string | null
 
   createdAt: string
 }
 
-/**
- * Input para criar movimentação
- */
-export type CreateTransactionInput = {
+/* =========================
+   CREATE INPUT
+========================= */
+
+export type CreateTransactionInput =
+  | CreateIncomeInput
+  | CreateExpenseInput
+  | CreateTransferInput
+
+type BaseInput = {
   type: TransactionType
-
-  originAccountId?: string | null
-  destinationAccountId?: string | null
-
   amount: number
-  description?: string
   date: string
-
+  description?: string
   categoryId?: string | null
   subcategoryId?: string | null
 }
 
-/**
- * Regras de negócio da movimentação
- */
+export type CreateIncomeInput = BaseInput & {
+  type: 'ENTRADA'
+  destinationAccountId: string
+}
+
+export type CreateExpenseInput = BaseInput & {
+  type: 'SAIDA'
+  paymentMethod: PaymentMethod
+  originAccountId: string
+
+  installments?: number
+  firstInstallmentMonth?: string
+}
+
+export type CreateTransferInput = BaseInput & {
+  type: 'TRANSFERENCIA'
+  originAccountId: string
+  destinationAccountId: string
+}
+
+/* =========================
+   VALIDATION
+========================= */
+
 export function validateCreateTransaction(
   input: CreateTransactionInput
 ) {
@@ -62,10 +90,6 @@ export function validateCreateTransaction(
     if (!input.destinationAccountId) {
       throw new Error('Conta de destino é obrigatória')
     }
-
-    if (input.originAccountId) {
-      throw new Error('Entrada não pode ter conta de origem')
-    }
   }
 
   if (input.type === 'SAIDA') {
@@ -73,8 +97,14 @@ export function validateCreateTransaction(
       throw new Error('Conta de origem é obrigatória')
     }
 
-    if (input.destinationAccountId) {
-      throw new Error('Saída não pode ter conta de destino')
+    if (input.paymentMethod === 'CARTAO_CREDITO') {
+      if (!input.installments || input.installments <= 0) {
+        throw new Error('Número de parcelas inválido')
+      }
+
+      if (!input.firstInstallmentMonth) {
+        throw new Error('Mês da primeira parcela é obrigatório')
+      }
     }
   }
 
@@ -84,7 +114,7 @@ export function validateCreateTransaction(
     }
 
     if (input.originAccountId === input.destinationAccountId) {
-      throw new Error('Contas de origem e destino devem ser diferentes')
+      throw new Error('Contas devem ser diferentes')
     }
   }
 }
