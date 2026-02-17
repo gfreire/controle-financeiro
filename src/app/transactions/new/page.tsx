@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { listAccounts } from '@/services/accounts.service'
 import { Account } from '@/domain/account'
+import { listCategories, listSubcategories } from '@/services/categories.service'
+import { Category, Subcategory } from '@/domain/category'
 
-type TransactionKind = 'AJUSTE' | 'ENTRADA' | 'SAIDA'
+type TransactionKind = 'ENTRADA' | 'SAIDA'
 type PaymentMethod = 'DINHEIRO' | 'CONTA_CORRENTE' | 'CARTAO_CREDITO'
 
 type Parcel = {
@@ -21,9 +23,13 @@ export default function NewTransactionPage() {
 
   const today = new Date().toISOString().slice(0, 10)
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([])
 
   useEffect(() => {
     listAccounts().then(setAccounts)
+    listCategories().then(setCategories)
+    listSubcategories().then(setSubcategories)
   }, [])
 
   /* =====================
@@ -60,7 +66,7 @@ export default function NewTransactionPage() {
       ).padStart(2, '0')}`
     })
 
-  const [parcels, setParcels] = useState<Parcel[]>([])
+  const [parcelOverrides, setParcelOverrides] = useState<Record<number, { value: string }>>({})
 
   /* =====================
      FILTRO DE CONTAS
@@ -84,80 +90,53 @@ export default function NewTransactionPage() {
      AUTO-SELEÇÃO DE CONTA
   ===================== */
 
-  useEffect(() => {
+  const autoAccountId = useMemo(() => {
     if (filteredAccounts.length === 1) {
-      setAccountId(filteredAccounts[0].id)
-    } else {
-      setAccountId('')
+      return filteredAccounts[0].id
     }
+    return ''
   }, [filteredAccounts])
 
-  /* =====================
-     GERAR PARCELAS AUTOMÁTICO
-  ===================== */
-
-  useEffect(() => {
-    if (paymentMethod !== 'CARTAO_CREDITO') {
-      setParcels([])
-      return
-    }
+  const parcels = useMemo<Parcel[]>(() => {
+    if (paymentMethod !== 'CARTAO_CREDITO') return []
 
     const total = Number(amount)
     const qty = Number(installments)
 
-    if (!total || !qty || qty <= 0) return
+    if (!total || !qty || qty <= 0) return []
 
     const baseValue = +(total / qty).toFixed(2)
     const [year, month] = firstInstallmentMonth
       .split('-')
       .map(Number)
 
-    setParcels((prev) => {
-      const next: Parcel[] = []
+    const next: Parcel[] = []
 
-      for (let i = 0; i < qty; i++) {
-        const d = new Date(year, month - 1 + i, 1)
-        const ym = `${d.getFullYear()}-${String(
-          d.getMonth() + 1
-        ).padStart(2, '0')}`
+    for (let i = 0; i < qty; i++) {
+      const d = new Date(year, month - 1 + i, 1)
+      const ym = `${d.getFullYear()}-${String(
+        d.getMonth() + 1
+      ).padStart(2, '0')}`
 
-        const existing = prev[i]
+      const override = parcelOverrides[i]
 
-        next.push({
-          month: ym,
-          value:
-            existing?.edited === true
-              ? existing.value
-              : baseValue.toFixed(2),
-          edited: existing?.edited,
-        })
-      }
+      next.push({
+        month: ym,
+        value: override ? override.value : baseValue.toFixed(2),
+        edited: Boolean(override),
+      })
+    }
 
-      return next
-    })
-  }, [amount, installments, firstInstallmentMonth, paymentMethod])
+    return next
+  }, [amount, installments, firstInstallmentMonth, paymentMethod, parcelOverrides])
 
   function updateParcelValue(index: number, value: string) {
-    setParcels((prev) =>
-      prev.map((p, i) =>
-        i === index
-          ? { ...p, value, edited: true }
-          : p
-      )
-    )
+    setParcelOverrides((prev) => ({
+      ...prev,
+      [index]: { value },
+    }))
   }
 
-  /* =====================
-     RESET POR TIPO
-  ===================== */
-
-  useEffect(() => {
-    setPaymentMethod('')
-    setAccountId('')
-    setParcels([])
-    setCategory('')
-    setSubcategory('')
-  }, [kind])
 
   return (
     <main className="container">
@@ -184,20 +163,25 @@ export default function NewTransactionPage() {
         <select
           className="select"
           value={kind}
-          onChange={(e) =>
-            setKind(e.target.value as TransactionKind)
-          }
+          onChange={(e) => {
+            const nextKind = e.target.value as TransactionKind
+            setKind(nextKind)
+            setPaymentMethod('')
+            setAccountId('')
+            setParcelOverrides({})
+            setCategory('')
+            setSubcategory('')
+          }}
         >
           <option value="SAIDA">Saída</option>
           <option value="ENTRADA">Entrada</option>
-          <option value="AJUSTE">Ajuste</option>
         </select>
       </div>
 
       {/* FORMA DE PAGAMENTO */}
-      {kind === 'SAIDA' && (
+      {(kind === 'SAIDA' || kind === 'ENTRADA') && (
         <div className="field">
-          <label>Forma de pagamento</label>
+          <label>Forma</label>
           <select
             className="select"
             value={paymentMethod}
@@ -208,13 +192,17 @@ export default function NewTransactionPage() {
             }
           >
             <option value="">Selecione</option>
+
             <option value="DINHEIRO">Dinheiro</option>
             <option value="CONTA_CORRENTE">
               Débito / Pix
             </option>
-            <option value="CARTAO_CREDITO">
-              Cartão de crédito
-            </option>
+
+            {kind === 'SAIDA' && (
+              <option value="CARTAO_CREDITO">
+                Cartão de crédito
+              </option>
+            )}
           </select>
         </div>
       )}
@@ -225,10 +213,11 @@ export default function NewTransactionPage() {
           <label>Conta</label>
           <select
             className="select"
-            value={accountId}
+            value={accountId || autoAccountId}
             onChange={(e) => setAccountId(e.target.value)}
           >
             <option value="">Selecione</option>
+
             {filteredAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -239,25 +228,48 @@ export default function NewTransactionPage() {
       )}
 
       {/* CATEGORIA */}
-      {kind === 'SAIDA' && (
+      {(kind === 'SAIDA' || kind === 'ENTRADA') && (
         <>
           <div className="field">
             <label>Categoria</label>
-            <input
-              className="input"
+            <select
+              className="select"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
+              onChange={(e) => {
+                setCategory(e.target.value)
+                setSubcategory('')
+              }}
+            >
+              <option value="">Selecione</option>
+              {categories
+                .filter((c) => c.type === kind)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
           </div>
 
-          <div className="field">
-            <label>Subcategoria</label>
-            <input
-              className="input"
-              value={subcategory}
-              onChange={(e) => setSubcategory(e.target.value)}
-            />
-          </div>
+          {kind === 'SAIDA' && category && (
+            <div className="field">
+              <label>Subcategoria</label>
+              <select
+                className="select"
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+              >
+                <option value="">Selecione</option>
+                {subcategories
+                  .filter((s) => s.categoryId === category)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </>
       )}
 
@@ -273,7 +285,7 @@ export default function NewTransactionPage() {
 
       {/* VALOR */}
       <div className="field">
-        <label>Valor total</label>
+        <label>Valor</label>
         <input
           className="input"
           type="number"
@@ -282,6 +294,33 @@ export default function NewTransactionPage() {
         />
       </div>
 
+      {paymentMethod === 'CARTAO_CREDITO' && (
+        <>
+          <div className="field">
+            <label>Número de parcelas</label>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              value={installments}
+              onChange={(e) => setInstallments(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label>Mês da primeira parcela</label>
+            <input
+              className="input"
+              type="month"
+              value={firstInstallmentMonth}
+              onChange={(e) =>
+                setFirstInstallmentMonth(e.target.value)
+              }
+            />
+          </div>
+        </>
+      )}
+
       {/* PARCELAS */}
       {paymentMethod === 'CARTAO_CREDITO' &&
         parcels.length > 0 && (
@@ -289,14 +328,7 @@ export default function NewTransactionPage() {
             <label>Parcelas</label>
 
             {parcels.map((p, i) => (
-              <div
-                key={i}
-                className="field"
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                }}
-              >
+              <div key={i} className="parcel-row">
                 <div className="readonly-field">
                   {p.month}
                 </div>
