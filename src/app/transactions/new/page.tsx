@@ -55,10 +55,6 @@ export default function NewTransactionPage() {
     })
 
   const [parcelValues, setParcelValues] = useState<number[]>([])
-  const [lastBaseConfig, setLastBaseConfig] = useState<{
-    amount: string
-    installments: string
-  }>({ amount: '', installments: '' })
 
   const filteredAccounts = useMemo(() => {
     if (!paymentMethod) return []
@@ -131,7 +127,6 @@ export default function NewTransactionPage() {
     })
 
     setParcelValues(next)
-    setLastBaseConfig({ amount: totalStr, installments: qtyStr })
   }
 
   async function handleSubmit(
@@ -185,7 +180,6 @@ export default function NewTransactionPage() {
     setDescription('')
     setAmount('')
     setParcelValues([])
-    setLastBaseConfig({ amount: '', installments: '' })
   }
 
   return (
@@ -246,7 +240,6 @@ export default function NewTransactionPage() {
 
               if (next !== 'CARTAO_CREDITO') {
                 setParcelValues([])
-                setLastBaseConfig({ amount: '', installments: '' })
               }
             }}
           >
