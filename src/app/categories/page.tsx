@@ -137,13 +137,7 @@ export default function CategoriesPage() {
       </div>
 
       {activeTab === 'SAIDA' && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginBottom: 12,
-          }}
-        >
+        <div className="expand-all-row">
           <button
             className="link small"
             onClick={toggleAll}
@@ -177,102 +171,74 @@ export default function CategoriesPage() {
               hidden[category.id] ?? false
 
             return (
-              <div key={category.id} className="card">
-                <div className="card-main">
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent:
-                        'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                    >
-                      {activeTab === 'SAIDA' &&
-                        subs.length > 0 && (
-                          <button
-                            className="expand-btn"
-                            onClick={() =>
-                              toggleExpand(
-                                category.id
-                              )
-                            }
-                          >
-                            {isExpanded ? '−' : '+'}
-                          </button>
-                        )}
-
-                      <strong>
-                        {category.name}
-                      </strong>
-
-                      {category.isDefault && (
-                        <span className="badge">
-                          Default
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="card-actions">
-                      {!category.isDefault && (
-                        <button className="link">
-                          Editar
-                        </button>
-                      )}
-
-                      <label className="switch">
-                        <input
-                          type="checkbox"
-                          checked={!isHidden}
-                          onChange={() =>
-                            toggleHidden(
+              <div key={category.id}>
+                <div className="category-row">
+                  <div className="category-left">
+                    {activeTab === 'SAIDA' &&
+                      subs.length > 0 && (
+                        <button
+                          className="expand-btn"
+                          onClick={() =>
+                            toggleExpand(
                               category.id
                             )
                           }
-                        />
-                        <span className="slider" />
-                      </label>
-                    </div>
+                        >
+                          {isExpanded ? '−' : '+'}
+                        </button>
+                      )}
+
+                    <strong>
+                      {category.name}
+                    </strong>
+
+                    {category.isDefault && (
+                      <span className="badge">
+                        Default
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="category-actions">
+                    {!category.isDefault && (
+                      <button className="link">
+                        Editar
+                      </button>
+                    )}
+
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={!isHidden}
+                        onChange={() =>
+                          toggleHidden(
+                            category.id
+                          )
+                        }
+                      />
+                      <span className="slider" />
+                    </label>
                   </div>
                 </div>
 
                 {activeTab === 'SAIDA' &&
                   isExpanded &&
                   subs.length > 0 && (
-                    <ul
-                      style={{
-                        marginTop: 8,
-                        paddingLeft: 28,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
-                    >
+                    <div className="subcategory-list">
                       {subs.map((sub) => {
                         const subHidden =
                           hidden[sub.id] ?? false
 
                         return (
-                          <li
+                          <div
                             key={sub.id}
-                            style={{
-                              display: 'flex',
-                              justifyContent:
-                                'space-between',
-                              alignItems: 'center',
-                            }}
+                            className="subcategory-row"
                           >
                             <span>
                               {sub.name}
                             </span>
 
-                            <div className="card-actions">
+                            <div className="category-actions">
                               {!sub.isDefault && (
                                 <button className="link">
                                   Editar
@@ -292,10 +258,10 @@ export default function CategoriesPage() {
                                 <span className="slider" />
                               </label>
                             </div>
-                          </li>
+                          </div>
                         )
                       })}
-                    </ul>
+                    </div>
                   )}
               </div>
             )
