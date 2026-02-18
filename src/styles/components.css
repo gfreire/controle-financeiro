@@ -58,7 +58,7 @@
 
 .card-main strong {
   font-size: 16px;
-  color: #f9fafb;
+  color: #111111;
 }
 
 .card-title {
@@ -496,6 +496,24 @@ button.link.danger:hover {
 .card-transfer {
   background: linear-gradient(135deg, #0f172a, #1e293b);
   border: 1px solid #334155;
+}
+
+.card-income .card-main strong,
+.card-expense .card-main strong,
+.card-transfer .card-main strong {
+  color: #f9fafb;
+}
+
+.card-income .transaction-account,
+.card-expense .transaction-account,
+.card-transfer .transaction-account {
+  color: #cbd5e1;
+}
+
+.card-income .transaction-category,
+.card-expense .transaction-category,
+.card-transfer .transaction-category {
+  color: #cbd5e1;
 }
 
 .transaction-title {
