@@ -3,6 +3,7 @@ import {
   CreateTransactionInput,
   validateCreateTransaction,
 } from '@/domain/transaction'
+import { TimelineItem } from '@/domain/transaction'
 
 export async function createTransaction(
   input: CreateTransactionInput
@@ -209,4 +210,63 @@ async function createCardPurchase(
   if (parcelError) {
     throw new Error('Erro ao gerar parcelas')
   }
+}
+
+/* =========================
+   TIMELINE (VIEW)
+========================= */
+
+type DBTimelineRow = {
+  id: string
+  type: 'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA'
+  description: string | null
+  amount: number
+  date: string
+  competence: string | null
+
+  origin_account_name: string | null
+  origin_account_type: string | null
+
+  destination_account_name: string | null
+  destination_account_type: string | null
+
+  category_name: string | null
+  subcategory_name: string | null
+
+  installments: number | null
+}
+
+function mapTimelineRow(row: DBTimelineRow): TimelineItem {
+  return {
+    id: row.id,
+    type: row.type,
+    description: row.description,
+    amount: row.amount,
+    date: row.date,
+    competence: row.competence,
+    originAccountName: row.origin_account_name,
+    originAccountType: row.origin_account_type,
+    destinationAccountName: row.destination_account_name,
+    destinationAccountType: row.destination_account_type,
+    categoryName: row.category_name,
+    subcategoryName: row.subcategory_name,
+    installments: row.installments,
+  }
+}
+
+export async function listTimeline(): Promise<TimelineItem[]> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+  if (!userId) throw new Error('Usuário não autenticado')
+
+  const { data, error } = await supabase
+    .from('vw_timeline')
+    .select('*')
+    .order('date', { ascending: false })
+
+  if (error) {
+    throw new Error('Erro ao carregar timeline')
+  }
+
+  return (data ?? []).map(mapTimelineRow)
 }

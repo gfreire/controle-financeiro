@@ -30,6 +30,43 @@ export type Transaction = {
 }
 
 /* =========================
+   TIMELINE ITEM (LISTAGEM)
+========================= */
+
+export type TimelineItemType =
+  | 'ENTRADA'
+  | 'SAIDA'
+  | 'TRANSFERENCIA'
+
+export type TimelineItem = {
+  id: string
+  type: TimelineItemType
+
+  description: string | null
+  amount: number
+
+  // data original da movimentação ou compra
+  date: string
+
+  // competência (para futuras evoluções)
+  competence: string | null
+
+  // contas envolvidas
+  originAccountName: string | null
+  originAccountType: string | null
+
+  destinationAccountName: string | null
+  destinationAccountType: string | null
+
+  // categoria (subcategoria só para saída)
+  categoryName: string | null
+  subcategoryName: string | null
+
+  // cartão
+  installments: number | null
+}
+
+/* =========================
    CREATE INPUT
 ========================= */
 

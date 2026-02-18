@@ -1,47 +1,69 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import { Transaction } from '@/domain/transaction'
+import { listTimeline } from '@/services/transactions.service'
+import { TimelineItem } from '@/domain/transaction'
+
+function formatCurrency(value: number) {
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
+}
+
+function formatDate(date: string) {
+  const d = new Date(date)
+  return d.toLocaleDateString('pt-BR')
+}
+
+function formatMonthLabel(ym: string) {
+  const [year, month] = ym.split('-').map(Number)
+  const d = new Date(year, month - 1, 1)
+  return d.toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
 
 export default function TransactionsPage() {
-  const [items, setItems] = useState<Transaction[]>([])
+  const [items, setItems] = useState<TimelineItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadTransactions() {
-    try {
-      setLoading(true)
-
-      const { data, error } = await supabase
-        .from('movimentacoes')
-        .select('*')
-        .order('data', { ascending: false })
-
-      if (error) throw error
-
-      setItems(
-        data.map((row) => ({
-          id: row.id,
-          accountId: row.conta_origem_id,
-          type: row.tipo,
-          amount: row.valor,
-          description: row.descricao,
-          date: row.data,
-          createdAt: row.created_at,
-        }))
-      )
-    } catch {
-      setError('Erro ao carregar movimentações')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    loadTransactions()
+    async function load() {
+      try {
+        setLoading(true)
+        const data = await listTimeline()
+        setItems(data)
+      } catch {
+        setError('Erro ao carregar movimentações')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    load()
   }, [])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, TimelineItem[]>()
+
+    for (const item of items) {
+      const key = item.competence ?? '0000-00'
+
+      if (!map.has(key)) {
+        map.set(key, [])
+      }
+
+      map.get(key)!.push(item)
+    }
+
+    return Array.from(map.entries()).sort(
+      (a, b) => (a[0] < b[0] ? 1 : -1)
+    )
+  }, [items])
 
   return (
     <main className="container">
@@ -61,30 +83,98 @@ export default function TransactionsPage() {
       {error && <div className="error field">{error}</div>}
 
       {!loading && items.length === 0 && (
-        <p className="muted">Nenhuma movimentação registrada</p>
+        <p className="empty-state">
+          Nenhuma movimentação registrada
+        </p>
       )}
 
       <div className="list">
-        {items.map((t) => (
-          <div key={t.id} className="card">
-            <div className="card-main">
-              <strong>
-                {t.type} — R$ {t.amount}
-              </strong>
-
-              <span className="muted">
-                {t.description || 'Sem descrição'} • {t.date}
-              </span>
+        {grouped.map(([month, monthItems]) => (
+          <div key={month} className="month-group">
+            <div className="month-label">
+              {formatMonthLabel(month)}
             </div>
 
-            <div className="card-actions">
-              <Link
-                href={`/transactions/${t.id}/edit`}
-                className="link"
-              >
-                Editar
-              </Link>
-            </div>
+            {monthItems.map((t) => {
+              const cardClass =
+                t.type === 'ENTRADA'
+                  ? 'card card-income'
+                  : t.type === 'SAIDA'
+                  ? 'card card-expense'
+                  : 'card card-transfer'
+
+              return (
+                <div key={t.id} className={cardClass}>
+                  <div className="card-main">
+                    {t.type !== 'TRANSFERENCIA' ? (
+                      <>
+                        <div className="transaction-title">
+                          <strong>
+                            {t.description || 'Sem descrição'}
+                          </strong>
+                        </div>
+
+                        {t.categoryName && (
+                          <div className="transaction-category">
+                            {t.type === 'SAIDA' && t.subcategoryName
+                              ? `${t.categoryName}/${t.subcategoryName}`
+                              : t.categoryName}
+                          </div>
+                        )}
+
+                        <div className="transaction-account">
+                          {t.type === 'ENTRADA'
+                            ? t.destinationAccountName
+                            : t.originAccountName}
+                        </div>
+
+                        <div className="transaction-footer">
+                          <span>
+                            {formatDate(t.date)}
+                          </span>
+
+                          <span className="transaction-amount">
+                            {formatCurrency(t.amount)}
+                            {t.installments &&
+                              ` (${t.installments}x)`}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="transaction-title">
+                          <strong>Transferência</strong>
+                        </div>
+
+                        <div className="transaction-account">
+                          {t.originAccountName} →{' '}
+                          {t.destinationAccountName}
+                        </div>
+
+                        <div className="transaction-footer">
+                          <span>
+                            {formatDate(t.date)}
+                          </span>
+
+                          <span className="transaction-amount">
+                            {formatCurrency(t.amount)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="card-actions">
+                    <Link
+                      href={`/transactions/${t.id}/edit`}
+                      className="link"
+                    >
+                      Editar
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         ))}
       </div>
