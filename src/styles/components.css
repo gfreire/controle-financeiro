@@ -558,3 +558,10 @@ button.link.danger:hover {
 .transaction-amount.transfer {
   color: #60a5fa;
 }
+
+.transaction-installment-range {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}

@@ -26,6 +26,28 @@ function formatMonthLabel(ym: string) {
   })
 }
 
+function getInstallmentRange(competence: string, installments: number) {
+  const [year, month] = competence.split('-').map(Number)
+
+  const start = new Date(year, month - 1, 1)
+
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    month: 'short',
+  })
+
+  const startLabel = formatter.format(start).replace('.', '')
+
+  // Se for apenas 1 parcela, exibe somente o mês inicial
+  if (installments === 1) {
+    return startLabel
+  }
+
+  const end = new Date(year, month - 1 + installments - 1, 1)
+  const endLabel = formatter.format(end).replace('.', '')
+
+  return `${startLabel}-${endLabel}`
+}
+
 export default function TransactionsPage() {
   const [items, setItems] = useState<TimelineItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,15 +151,29 @@ export default function TransactionsPage() {
                         </div>
 
                         <div className="transaction-footer">
-                          <span>
-                            {formatDate(t.date)}
-                          </span>
+                          <div className="transaction-footer-left">
+                            <span>
+                              {formatDate(t.date)}
+                            </span>
 
-                          <span className="transaction-amount">
-                            {formatCurrency(t.amount)}
-                            {t.installments &&
-                              ` (${t.installments}x)`}
-                          </span>
+                            {t.installments && (
+                              <div className="transaction-installment-range">
+                                {t.competence &&
+                                  getInstallmentRange(
+                                    t.competence,
+                                    t.installments
+                                  )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="transaction-footer-right">
+                            <span className="transaction-amount">
+                              {formatCurrency(t.amount)}
+                              {t.installments &&
+                                ` (${t.installments}x)`}
+                            </span>
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -152,13 +188,17 @@ export default function TransactionsPage() {
                         </div>
 
                         <div className="transaction-footer">
-                          <span>
-                            {formatDate(t.date)}
-                          </span>
+                          <div className="transaction-footer-left">
+                            <span>
+                              {formatDate(t.date)}
+                            </span>
+                          </div>
 
-                          <span className="transaction-amount">
-                            {formatCurrency(t.amount)}
-                          </span>
+                          <div className="transaction-footer-right">
+                            <span className="transaction-amount">
+                              {formatCurrency(t.amount)}
+                            </span>
+                          </div>
                         </div>
                       </>
                     )}
