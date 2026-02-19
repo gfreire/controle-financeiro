@@ -55,6 +55,25 @@ export default function NewTransactionPage() {
     })
 
   const [parcelValues, setParcelValues] = useState<string[]>([])
+  const [success, setSuccess] = useState(false)
+  function resetForm() {
+    setDate(today)
+    setKind('SAIDA')
+    setPaymentMethod('')
+    setAccountId('')
+    setDescription('')
+    setAmount('')
+    setCategory('')
+    setSubcategory('')
+    setInstallments('1')
+    setParcelValues([])
+    setFirstInstallmentMonth(() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(
+        d.getMonth() + 1
+      ).padStart(2, '0')}`
+    })
+  }
 
   const filteredAccounts = useMemo(() => {
     if (!paymentMethod) return []
@@ -184,13 +203,22 @@ export default function NewTransactionPage() {
       }
     }
 
-    setDescription('')
-    setAmount('')
-    setParcelValues([])
+    resetForm()
+    setSuccess(true)
+    setTimeout(() => {
+      setSuccess(false)
+    }, 2000)
   }
 
   return (
     <main className="container">
+      {success && (
+        <div className="success-overlay">
+          <div className="success-box">
+            Registro salvo com sucesso
+          </div>
+        </div>
+      )}
       <form onSubmit={handleSubmit}>
         <Link
           href="/transactions"
