@@ -204,9 +204,23 @@ export default function CategoriesPage() {
 
                   <div className="category-actions">
                     {!category.isDefault && (
-                      <button className="link">
-                        Editar
-                      </button>
+                      <>
+                        <Link
+                          href={`/categories/${category.id}/edit`}
+                          className="link"
+                        >
+                          Editar
+                        </Link>
+
+                        <button
+                          className="link danger"
+                          onClick={() =>
+                            console.log('Delete categoria', category.id)
+                          }
+                        >
+                          Excluir
+                        </button>
+                      </>
                     )}
 
                     <label className="switch">
@@ -243,9 +257,23 @@ export default function CategoriesPage() {
 
                             <div className="category-actions">
                               {!sub.isDefault && (
-                                <button className="link">
-                                  Editar
-                                </button>
+                                <>
+                                  <Link
+                                    href={`/categories/subcategory/${sub.id}/edit`}
+                                    className="link"
+                                  >
+                                    Editar
+                                  </Link>
+
+                                  <button
+                                    className="link danger"
+                                    onClick={() =>
+                                      console.log('Delete subcategoria', sub.id)
+                                    }
+                                  >
+                                    Excluir
+                                  </button>
+                                </>
                               )}
 
                               <label className="switch">

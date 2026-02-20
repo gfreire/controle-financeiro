@@ -1,21 +1,23 @@
+
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  getCategoryById,
-  updateCategory,
+  getSubcategoryById,
+  updateSubcategory,
 } from '@/services/categories.service'
-import { Category } from '@/domain/category'
+import { Subcategory } from '@/domain/category'
 
-export default function EditCategoryPage() {
+export default function EditSubcategoryPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
 
-  const [category, setCategory] =
-    useState<Category | null>(null)
+  const [subcategory, setSubcategory] =
+    useState<Subcategory | null>(null)
 
   const [name, setName] = useState('')
   const [error, setError] =
@@ -27,9 +29,9 @@ export default function EditCategoryPage() {
     async function load() {
       if (!id) return
 
-      const cat = await getCategoryById(id)
-      setCategory(cat)
-      setName(cat.name)
+      const sub = await getSubcategoryById(id)
+      setSubcategory(sub)
+      setName(sub.name)
     }
 
     load()
@@ -41,7 +43,7 @@ export default function EditCategoryPage() {
     e.preventDefault()
     setError(null)
 
-    if (!category) return
+    if (!subcategory) return
 
     try {
       setLoading(true)
@@ -54,13 +56,16 @@ export default function EditCategoryPage() {
         )
       }
 
-      if (category.isDefault) {
+      if (subcategory.isDefault) {
         throw new Error(
-          'Categorias padrão não podem ser editadas'
+          'Subcategoria padrão não pode ser editada'
         )
       }
 
-      await updateCategory(category.id, trimmed)
+      await updateSubcategory(
+        subcategory.id,
+        trimmed
+      )
 
       setSuccess(true)
 
@@ -79,7 +84,7 @@ export default function EditCategoryPage() {
     }
   }
 
-  if (!category) {
+  if (!subcategory) {
     return (
       <main className="container">
         <p>Carregando...</p>
@@ -102,7 +107,7 @@ export default function EditCategoryPage() {
       </Link>
 
       <h1 className="title">
-        Editar categoria
+        Editar subcategoria
       </h1>
 
       <form onSubmit={handleSubmit}>
@@ -114,7 +119,7 @@ export default function EditCategoryPage() {
             onChange={(e) =>
               setName(e.target.value)
             }
-            disabled={category.isDefault}
+            disabled={subcategory.isDefault}
           />
         </div>
 
@@ -124,7 +129,7 @@ export default function EditCategoryPage() {
           </div>
         )}
 
-        {!category.isDefault && (
+        {!subcategory.isDefault && (
           <button
             type="submit"
             className="button"

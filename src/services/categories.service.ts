@@ -179,3 +179,139 @@ export async function createSubcategory(
 
   return mapSubcategory(data)
 }
+
+/* =========================
+   GET CATEGORY BY ID
+========================= */
+
+export async function getCategoryById(
+  id: string
+): Promise<Category> {
+  const { data, error } = await supabase
+    .from('categorias')
+    .select('id, nome, tipo_categoria, user_id')
+    .eq('id', id)
+    .single()
+
+  if (error || !data) {
+    throw new Error('Categoria não encontrada')
+  }
+
+  return mapCategory(data)
+}
+
+/* =========================
+   GET SUBCATEGORY BY ID
+========================= */
+
+export async function getSubcategoryById(
+  id: string
+): Promise<Subcategory> {
+  const { data, error } = await supabase
+    .from('subcategorias')
+    .select('id, nome, categoria_id, user_id')
+    .eq('id', id)
+    .single()
+
+  if (error || !data) {
+    throw new Error('Subcategoria não encontrada')
+  }
+
+  return mapSubcategory(data)
+}
+
+/* =========================
+   UPDATE CATEGORY
+========================= */
+
+export async function updateCategory(
+  id: string,
+  name: string
+): Promise<void> {
+  const trimmed = name.trim()
+
+  if (trimmed.length < 2) {
+    throw new Error('Nome inválido')
+  }
+
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  // Impede edição de categoria default
+  const { data: existing } = await supabase
+    .from('categorias')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (!existing) {
+    throw new Error('Categoria não encontrada')
+  }
+
+  if (existing.user_id === null) {
+    throw new Error('Categoria padrão não pode ser editada')
+  }
+
+  const { error } = await supabase
+    .from('categorias')
+    .update({ nome: trimmed })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error('Erro ao atualizar categoria')
+  }
+}
+
+/* =========================
+   UPDATE SUBCATEGORY
+========================= */
+
+export async function updateSubcategory(
+  id: string,
+  name: string
+): Promise<void> {
+  const trimmed = name.trim()
+
+  if (trimmed.length < 2) {
+    throw new Error('Nome inválido')
+  }
+
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  // Impede edição de subcategoria default
+  const { data: existing } = await supabase
+    .from('subcategorias')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (!existing) {
+    throw new Error('Subcategoria não encontrada')
+  }
+
+  if (existing.user_id === null) {
+    throw new Error(
+      'Subcategoria padrão não pode ser editada'
+    )
+  }
+
+  const { error } = await supabase
+    .from('subcategorias')
+    .update({ nome: trimmed })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error('Erro ao atualizar subcategoria')
+  }
+}
