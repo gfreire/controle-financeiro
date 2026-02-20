@@ -110,9 +110,12 @@ export default function CategoriesPage() {
       <div className="header-row">
         <h1 className="title">Categorias</h1>
 
-        <button className="button secondary">
+        <Link
+          href="/categories/new"
+          className="button secondary"
+        >
           Nova categoria
-        </button>
+        </Link>
       </div>
 
       {/* Tabs */}
