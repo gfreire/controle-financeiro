@@ -315,3 +315,234 @@ export async function updateSubcategory(
     throw new Error('Erro ao atualizar subcategoria')
   }
 }
+
+/* =========================
+   USAGE CHECK
+========================= */
+
+export async function checkCategoryUsage(
+  categoryId: string
+): Promise<number> {
+  const { count: movCount } = await supabase
+    .from('movimentacoes')
+    .select('*', { count: 'exact', head: true })
+    .eq('categoria_id', categoryId)
+
+  const { count: purchaseCount } = await supabase
+    .from('compras_cartao')
+    .select('*', { count: 'exact', head: true })
+    .eq('categoria_id', categoryId)
+
+  return (movCount ?? 0) + (purchaseCount ?? 0)
+}
+
+export async function checkSubcategoryUsage(
+  subcategoryId: string
+): Promise<number> {
+  const { count: movCount } = await supabase
+    .from('movimentacoes')
+    .select('*', { count: 'exact', head: true })
+    .eq('subcategoria_id', subcategoryId)
+
+  const { count: purchaseCount } = await supabase
+    .from('compras_cartao')
+    .select('*', { count: 'exact', head: true })
+    .eq('subcategoria_id', subcategoryId)
+
+  return (movCount ?? 0) + (purchaseCount ?? 0)
+}
+
+/* =========================
+   DELETE CATEGORY
+========================= */
+
+export async function deleteCategory(
+  categoryId: string,
+  newCategoryId?: string | null,
+  newSubcategoryId?: string | null
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  const { data: existing } = await supabase
+    .from('categorias')
+    .select('user_id')
+    .eq('id', categoryId)
+    .single()
+
+  if (!existing) {
+    throw new Error('Categoria não encontrada')
+  }
+
+  if (existing.user_id === null) {
+    throw new Error('Categoria padrão não pode ser deletada')
+  }
+
+  /* 1️⃣ Atualiza movimentações */
+  await supabase
+    .from('movimentacoes')
+    .update({
+      categoria_id: newCategoryId ?? null,
+      subcategoria_id: newSubcategoryId ?? null,
+    })
+    .eq('categoria_id', categoryId)
+
+  /* 2️⃣ Atualiza compras cartão */
+  await supabase
+    .from('compras_cartao')
+    .update({
+      categoria_id: newCategoryId ?? null,
+      subcategoria_id: newSubcategoryId ?? null,
+    })
+    .eq('categoria_id', categoryId)
+
+  /* 3️⃣ Deleta subcategorias da categoria */
+  await supabase
+    .from('subcategorias')
+    .delete()
+    .eq('categoria_id', categoryId)
+    .eq('user_id', userId)
+
+  /* 4️⃣ Deleta categoria */
+  const { error } = await supabase
+    .from('categorias')
+    .delete()
+    .eq('id', categoryId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error('Erro ao deletar categoria')
+  }
+}
+
+/* =========================
+   DELETE SUBCATEGORY
+========================= */
+
+export async function deleteSubcategory(
+  subcategoryId: string,
+  newSubcategoryId?: string | null
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  const { data: existing } = await supabase
+    .from('subcategorias')
+    .select('user_id')
+    .eq('id', subcategoryId)
+    .single()
+
+  if (!existing) {
+    throw new Error('Subcategoria não encontrada')
+  }
+
+  if (existing.user_id === null) {
+    throw new Error('Subcategoria padrão não pode ser deletada')
+  }
+
+  const inUse = await checkSubcategoryUsage(subcategoryId)
+
+  if (inUse) {
+    await supabase
+      .from('movimentacoes')
+      .update({
+        subcategoria_id: newSubcategoryId ?? null,
+      })
+      .eq('subcategoria_id', subcategoryId)
+
+    await supabase
+      .from('compras_cartao')
+      .update({
+        subcategoria_id: newSubcategoryId ?? null,
+      })
+      .eq('subcategoria_id', subcategoryId)
+  }
+
+  const { error } = await supabase
+    .from('subcategorias')
+    .delete()
+    .eq('id', subcategoryId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error('Erro ao deletar subcategoria')
+  }
+}
+
+/* =========================
+   DISABLE / ENABLE
+========================= */
+
+export async function hideCategory(
+  categoryId: string
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  await supabase.from('categorias_ocultas').insert({
+    categoria_id: categoryId,
+    user_id: userId,
+  })
+}
+
+export async function unhideCategory(
+  categoryId: string
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  await supabase
+    .from('categorias_ocultas')
+    .delete()
+    .eq('categoria_id', categoryId)
+    .eq('user_id', userId)
+}
+
+export async function hideSubcategory(
+  subcategoryId: string
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  await supabase.from('subcategorias_ocultas').insert({
+    subcategoria_id: subcategoryId,
+    user_id: userId,
+  })
+}
+
+export async function unhideSubcategory(
+  subcategoryId: string
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  await supabase
+    .from('subcategorias_ocultas')
+    .delete()
+    .eq('subcategoria_id', subcategoryId)
+    .eq('user_id', userId)
+}

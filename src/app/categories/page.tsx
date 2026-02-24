@@ -5,6 +5,10 @@ import Link from 'next/link'
 import {
   listCategories,
   listSubcategories,
+  checkCategoryUsage,
+  checkSubcategoryUsage,
+  deleteCategory,
+  deleteSubcategory,
 } from '@/services/categories.service'
 import {
   Category,
@@ -30,6 +34,19 @@ export default function CategoriesPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'CATEGORY' | 'SUBCATEGORY'
+    id: string
+    name: string
+    usageCount: number
+  } | null>(null)
+
+  const [replacementCategoryId, setReplacementCategoryId] =
+    useState<string>('')
+
+  const [replacementSubcategoryId, setReplacementSubcategoryId] =
+    useState<string>('')
 
   async function loadData() {
     try {
@@ -99,6 +116,46 @@ export default function CategoriesPage() {
       ...prev,
       [id]: !prev[id],
     }))
+  }
+
+  async function handleDeleteCategory(id: string) {
+    const category = categories.find((c) => c.id === id)
+    if (!category) return
+
+    const usageCount = await checkCategoryUsage(id)
+
+    if (usageCount === 0) {
+      await deleteCategory(id, null)
+      await loadData()
+      return
+    }
+
+    setDeleteTarget({
+      type: 'CATEGORY',
+      id,
+      name: category.name,
+      usageCount,
+    })
+  }
+
+  async function handleDeleteSubcategory(id: string) {
+    const sub = subcategories.find((s) => s.id === id)
+    if (!sub) return
+
+    const usageCount = await checkSubcategoryUsage(id)
+
+    if (usageCount === 0) {
+      await deleteSubcategory(id, null)
+      await loadData()
+      return
+    }
+
+    setDeleteTarget({
+      type: 'SUBCATEGORY',
+      id,
+      name: sub.name,
+      usageCount,
+    })
   }
 
   return (
@@ -175,7 +232,11 @@ export default function CategoriesPage() {
 
             return (
               <div key={category.id}>
-                <div className="category-row">
+                <div
+                  className={`category-row ${
+                    isHidden ? 'is-disabled' : ''
+                  }`}
+                >
                   <div className="category-left">
                     {activeTab === 'SAIDA' &&
                       subs.length > 0 && (
@@ -215,7 +276,7 @@ export default function CategoriesPage() {
                         <button
                           className="link danger"
                           onClick={() =>
-                            console.log('Delete categoria', category.id)
+                            handleDeleteCategory(category.id)
                           }
                         >
                           Excluir
@@ -249,7 +310,9 @@ export default function CategoriesPage() {
                         return (
                           <div
                             key={sub.id}
-                            className="subcategory-row"
+                            className={`subcategory-row ${
+                              subHidden ? 'is-disabled' : ''
+                            }`}
                           >
                             <span>
                               {sub.name}
@@ -268,7 +331,7 @@ export default function CategoriesPage() {
                                   <button
                                     className="link danger"
                                     onClick={() =>
-                                      console.log('Delete subcategoria', sub.id)
+                                      handleDeleteSubcategory(sub.id)
                                     }
                                   >
                                     Excluir
@@ -297,6 +360,163 @@ export default function CategoriesPage() {
               </div>
             )
           })}
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="overlay overlay-centered">
+          <div className="modal">
+            <h3>Confirmação</h3>
+
+            <p>
+              A categoria/subcategoria{' '}
+              <strong>{deleteTarget.name}</strong>{' '}
+              está sendo utilizada em{' '}
+              <strong>{deleteTarget.usageCount}</strong>{' '}
+              {deleteTarget.usageCount === 1
+                ? 'registro'
+                : 'registros'}.
+            </p>
+
+            <p>
+              Ao deletar, todos os registros vinculados serão
+              atualizados. Você pode deixar sem categoria
+              ou migrar todos para outra categoria e,
+              opcionalmente, para uma subcategoria específica.
+            </p>
+
+            {deleteTarget.type === 'CATEGORY' && (
+              <>
+                <div className="field">
+                  <label>Nova categoria</label>
+                  <select
+                    className="select"
+                    value={replacementCategoryId}
+                    onChange={(e) => {
+                      setReplacementCategoryId(e.target.value)
+                      setReplacementSubcategoryId('')
+                    }}
+                  >
+                    <option value="">Sem categoria</option>
+                    {categories
+                      .filter((c) => {
+                        const original = categories.find(
+                          (cat) => cat.id === deleteTarget.id
+                        )
+                        return (
+                          c.id !== deleteTarget.id &&
+                          c.type === original?.type
+                        )
+                      })
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {replacementCategoryId && (
+                  <div className="field">
+                    <label>Nova subcategoria</label>
+                    <select
+                      className="select"
+                      value={replacementSubcategoryId}
+                      onChange={(e) =>
+                        setReplacementSubcategoryId(
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="">
+                        Sem subcategoria
+                      </option>
+                      {subcategories
+                        .filter(
+                          (s) =>
+                            s.categoryId ===
+                            replacementCategoryId
+                        )
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+
+            {deleteTarget.type === 'SUBCATEGORY' && (
+              <div className="field">
+                <label>Nova subcategoria</label>
+                <select
+                  className="select"
+                  value={replacementSubcategoryId}
+                  onChange={(e) =>
+                    setReplacementSubcategoryId(
+                      e.target.value
+                    )
+                  }
+                >
+                  <option value="">Sem subcategoria</option>
+                  {subcategories
+                    .filter((s) => {
+                      const originalSub = subcategories.find(
+                        (sub) => sub.id === deleteTarget.id
+                      )
+
+                      return (
+                        s.id !== deleteTarget.id &&
+                        s.categoryId === originalSub?.categoryId
+                      )
+                    })
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setDeleteTarget(null)
+                  setReplacementCategoryId('')
+                  setReplacementSubcategoryId('')
+                }}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="button danger"
+                onClick={async () => {
+                  if (deleteTarget.type === 'CATEGORY') {
+                    await deleteCategory(
+                      deleteTarget.id,
+                      replacementCategoryId || null
+                    )
+                  } else {
+                    await deleteSubcategory(
+                      deleteTarget.id,
+                      replacementSubcategoryId || null
+                    )
+                  }
+
+                  setDeleteTarget(null)
+                  setReplacementCategoryId('')
+                  setReplacementSubcategoryId('')
+                  await loadData()
+                }}
+              >
+                Confirmar exclusão
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

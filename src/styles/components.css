@@ -73,6 +73,11 @@
   flex-shrink: 0;
 }
 
+.is-disabled {
+  opacity: 0.5;
+  background-color: #f5f6f8;
+}
+
 /* =========================
    EMPTY STATE
 ========================= */
@@ -300,6 +305,14 @@ button.link.danger:hover {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.overlay-centered {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* =========================

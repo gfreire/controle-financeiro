@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { listTimeline } from '@/services/transactions.service'
+import { listTimeline, deleteTransaction } from '@/services/transactions.service'
 import { TimelineItem } from '@/domain/transaction'
 
 function formatCurrency(value: number) {
@@ -52,6 +52,7 @@ export default function TransactionsPage() {
   const [items, setItems] = useState<TimelineItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -68,6 +69,19 @@ export default function TransactionsPage() {
 
     load()
   }, [])
+
+  async function confirmDelete() {
+    if (!deleteId) return
+
+    try {
+      await deleteTransaction(deleteId)
+      setItems((prev) => prev.filter((item) => item.id !== deleteId))
+    } catch {
+      alert('Erro ao deletar movimentação')
+    } finally {
+      setDeleteId(null)
+    }
+  }
 
   const grouped = useMemo(() => {
     const map = new Map<string, TimelineItem[]>()
@@ -211,6 +225,14 @@ export default function TransactionsPage() {
                     >
                       Editar
                     </Link>
+
+                    <button
+                      type="button"
+                      className="link danger"
+                      onClick={() => setDeleteId(t.id)}
+                    >
+                      Deletar
+                    </button>
                   </div>
                 </div>
               )
@@ -218,6 +240,33 @@ export default function TransactionsPage() {
           </div>
         ))}
       </div>
+
+      {deleteId && (
+        <div className="overlay overlay-centered">
+          <div className="modal">
+            <h2>Confirmar exclusão</h2>
+            <p>
+              Tem certeza que deseja deletar esta movimentação?
+            </p>
+
+            <div className="modal-actions">
+              <button
+                className="button secondary"
+                onClick={() => setDeleteId(null)}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="button danger"
+                onClick={confirmDelete}
+              >
+                Deletar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

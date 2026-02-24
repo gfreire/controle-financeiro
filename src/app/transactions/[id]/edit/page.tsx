@@ -2,55 +2,203 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { TransactionType } from '@/domain/transaction'
+import { listCategories, listSubcategories } from '@/services/categories.service'
+import { Category, Subcategory } from '@/domain/category'
 
-export default function EditTransactionPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+export default function EditTransactionPage() {
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [categories, setCategories] = useState<Category[]>([])
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [subcategoryId, setSubcategoryId] = useState('')
+  const [type, setType] = useState<'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA'>('SAIDA')
+  const [isCardPurchase, setIsCardPurchase] = useState(false)
+  const [installments, setInstallments] = useState<number | null>(null)
+  const [firstInstallmentMonth, setFirstInstallmentMonth] = useState('')
+  const [parcelValues, setParcelValues] = useState<string[]>([])
+
+  const { id } = useParams<{ id: string }>()
+
   useEffect(() => {
+    listCategories().then(setCategories)
+    listSubcategories().then(setSubcategories)
+
+    // 1️⃣ tenta carregar como movimentação normal
     supabase
       .from('movimentacoes')
       .select('*')
-      .eq('id', params.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setError('Movimentação não encontrada')
+      .eq('id', id)
+      .maybeSingle()
+      .then(async ({ data, error }) => {
+        if (data && !error) {
+          setAmount(String(data.valor))
+          setDate(data.data)
+          setDescription(data.descricao ?? '')
+          setType(data.tipo)
+          setCategoryId(data.categoria_id ?? '')
+          setSubcategoryId(data.subcategoria_id ?? '')
+          setIsCardPurchase(false)
+          setLoading(false)
           return
         }
 
-        setAmount(String(data.valor))
-        setDate(data.data)
-        setDescription(data.descricao ?? '')
+        // 2️⃣ se não for movimentação, tenta como compra de cartão
+        const { data: cardData, error: cardError } = await supabase
+          .from('compras_cartao')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle()
+
+        if (cardData && !cardError) {
+          setAmount(String(cardData.valor_total))
+          setDate(cardData.data_compra)
+          setDescription(cardData.descricao ?? '')
+          setType('SAIDA')
+          setCategoryId(cardData.categoria_id ?? '')
+          setSubcategoryId(cardData.subcategoria_id ?? '')
+          setInstallments(cardData.numero_parcelas)
+
+          // carregar parcelas
+          const { data: parcelas } = await supabase
+            .from('parcelas_cartao')
+            .select('*')
+            .eq('compra_cartao_id', id)
+            .order('competencia', { ascending: true })
+
+          if (parcelas && parcelas.length > 0) {
+            setFirstInstallmentMonth(
+              parcelas[0].competencia.slice(0, 7)
+            )
+            setParcelValues(parcelas.map((p) => String(p.valor)))
+          }
+
+          setIsCardPurchase(true)
+          setLoading(false)
+          return
+        }
+
+        setError('Transação não encontrada')
         setLoading(false)
       })
-  }, [params.id])
+  }, [id])
 
   async function handleSave() {
     try {
-      await supabase
-        .from('movimentacoes')
-        .update({
-          valor: Number(amount),
-          data: date,
-          descricao: description,
-        })
-        .eq('id', params.id)
+      if (!isCardPurchase) {
+        await supabase
+          .from('movimentacoes')
+          .update({
+            valor: Number(amount),
+            data: date,
+            descricao: description,
+            categoria_id: categoryId || null,
+            subcategoria_id: subcategoryId || null,
+          })
+          .eq('id', id)
+      } else {
+        await supabase
+          .from('compras_cartao')
+          .update({
+            valor_total: Number(amount),
+            data_compra: date,
+            descricao: description,
+            categoria_id: categoryId || null,
+            subcategoria_id: subcategoryId || null,
+          })
+          .eq('id', id)
+
+        if (!installments || !firstInstallmentMonth) {
+          throw new Error('Parcelamento inválido')
+        }
+
+        await supabase
+          .from('parcelas_cartao')
+          .delete()
+          .eq('compra_cartao_id', id)
+
+        if (installments && installments > 0 && firstInstallmentMonth) {
+          const [year, month] = firstInstallmentMonth
+            .split('-')
+            .map(Number)
+
+          const values: number[] = []
+
+          for (let i = 0; i < installments; i++) {
+            const raw = parcelValues[i]
+            const parsed = Number(raw)
+            values.push(!isNaN(parsed) && parsed > 0 ? parsed : 0)
+          }
+
+          const newParcels = values.map((value, index) => {
+            const d = new Date(year, month - 1 + index, 1)
+            return {
+              compra_cartao_id: id,
+              competencia: d.toISOString().slice(0, 10),
+              valor: value,
+            }
+          })
+
+          if (newParcels.length > 0) {
+            await supabase
+              .from('parcelas_cartao')
+              .insert(newParcels)
+          }
+        }
+      }
 
       window.location.href = '/transactions'
     } catch {
       alert('Erro ao salvar')
     }
   }
+
+  function formatMonthYear(year: number, month: number) {
+    const date = new Date(year, month - 1, 1)
+    return date.toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    })
+  }
+
+  function updateParcel(index: number, value: string) {
+    setParcelValues((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!isCardPurchase) return
+    if (!installments || installments <= 0) return
+
+    const total = Number(amount)
+    if (!total || total <= 0) return
+
+    const base = Math.floor((total / installments) * 100) / 100
+    const remainder = Number(
+      (total - base * installments).toFixed(2)
+    )
+
+    const next: string[] = []
+
+    for (let i = 0; i < installments; i++) {
+      if (i === 0) {
+        next.push((base + remainder).toFixed(2))
+      } else {
+        next.push(base.toFixed(2))
+      }
+    }
+
+    setParcelValues(next)
+  }, [amount, installments, isCardPurchase])
 
   if (loading) {
     return <main className="container">Carregando...</main>
@@ -68,16 +216,7 @@ export default function EditTransactionPage({
 
       <h1 className="title">Editar movimentação</h1>
 
-      <div className="field">
-        <label>Valor</label>
-        <input
-          className="input"
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-      </div>
-
+      {/* DATA */}
       <div className="field">
         <label>Data</label>
         <input
@@ -88,6 +227,49 @@ export default function EditTransactionPage({
         />
       </div>
 
+      {/* CATEGORIA */}
+      <div className="field">
+        <label>Categoria</label>
+        <select
+          className="select"
+          value={categoryId}
+          onChange={(e) => {
+            setCategoryId(e.target.value)
+            setSubcategoryId('')
+          }}
+        >
+          <option value="">Selecione</option>
+          {categories
+            .filter((c) => c.type === type)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+        </select>
+      </div>
+
+      {type === 'SAIDA' && categoryId && (
+        <div className="field">
+          <label>Subcategoria</label>
+          <select
+            className="select"
+            value={subcategoryId}
+            onChange={(e) => setSubcategoryId(e.target.value)}
+          >
+            <option value="">Selecione</option>
+            {subcategories
+              .filter((s) => s.categoryId === categoryId)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
+
+      {/* DESCRIÇÃO */}
       <div className="field">
         <label>Descrição</label>
         <input
@@ -96,6 +278,77 @@ export default function EditTransactionPage({
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+
+      {/* VALOR */}
+      <div className="field">
+        <label>Valor</label>
+        <input
+          className="input"
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </div>
+
+      {/* PARCELAMENTO (APENAS CARTÃO) */}
+      {isCardPurchase && installments && (
+        <>
+          <div className="field">
+            <label>Número de parcelas</label>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              value={installments}
+              onChange={(e) => {
+                setInstallments(Number(e.target.value))
+                setParcelValues([])
+              }}
+            />
+          </div>
+
+          <div className="field">
+            <label>Mês da primeira parcela</label>
+            <input
+              className="input"
+              type="month"
+              value={firstInstallmentMonth}
+              onChange={(e) =>
+                setFirstInstallmentMonth(e.target.value)
+              }
+            />
+          </div>
+
+          {parcelValues.map((value, i) => (
+            <div key={i} className="parcel-row">
+              <div className="readonly-field">
+                {(() => {
+                  if (!firstInstallmentMonth) return `Parcela ${i + 1}`
+
+                  const [year, month] = firstInstallmentMonth
+                    .split('-')
+                    .map(Number)
+
+                  const current = new Date(year, month - 1 + i, 1)
+
+                  return current.toLocaleDateString('pt-BR', {
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                })()}
+              </div>
+              <input
+                className="input"
+                type="number"
+                value={value}
+                onChange={(e) =>
+                  updateParcel(i, e.target.value)
+                }
+              />
+            </div>
+          ))}
+        </>
+      )}
 
       <button className="button" onClick={handleSave}>
         Salvar alterações

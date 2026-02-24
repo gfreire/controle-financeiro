@@ -270,3 +270,78 @@ export async function listTimeline(): Promise<TimelineItem[]> {
 
   return (data ?? []).map(mapTimelineRow)
 }
+
+/* =========================
+   DELETE TRANSACTION
+========================= */
+
+export async function deleteTransaction(id: string): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+  if (!userId) throw new Error('Usuário não autenticado')
+
+  // 1️⃣ Try delete from movimentacoes
+  const { data: mov, error: movError } = await supabase
+    .from('movimentacoes')
+    .select('id')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (movError) {
+    throw new Error('Erro ao verificar movimentação')
+  }
+
+  if (mov) {
+    const { error } = await supabase
+      .from('movimentacoes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (error) {
+      throw new Error('Erro ao deletar movimentação')
+    }
+
+    return
+  }
+
+  // 2️⃣ Try delete from compras_cartao
+  const { data: purchase, error: purchaseError } = await supabase
+    .from('compras_cartao')
+    .select('id')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (purchaseError) {
+    throw new Error('Erro ao verificar compra no cartão')
+  }
+
+  if (purchase) {
+    // delete parcelas first
+    const { error: parcelError } = await supabase
+      .from('parcelas_cartao')
+      .delete()
+      .eq('compra_cartao_id', id)
+      .eq('user_id', userId)
+
+    if (parcelError) {
+      throw new Error('Erro ao deletar parcelas')
+    }
+
+    const { error: purchaseDeleteError } = await supabase
+      .from('compras_cartao')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (purchaseDeleteError) {
+      throw new Error('Erro ao deletar compra no cartão')
+    }
+
+    return
+  }
+
+  throw new Error('Registro não encontrado para exclusão')
+}
