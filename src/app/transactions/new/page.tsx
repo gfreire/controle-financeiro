@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { listAccounts } from '@/services/accounts.service'
-import { listCategories, listSubcategories } from '@/services/categories.service'
+import { 
+  listCategories, 
+  listSubcategories,
+  createCategoryWithOptionalSubcategory
+} from '@/services/categories.service'
 import { createTransaction } from '@/services/transactions.service'
 import { Account } from '@/domain/account'
 import { Category, Subcategory } from '@/domain/category'
@@ -44,6 +48,10 @@ export default function NewTransactionPage() {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
+  const [isNewCategory, setIsNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [isNewSubcategory, setIsNewSubcategory] = useState(false)
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
   const [installments, setInstallments] =
     useState('1')
   const [firstInstallmentMonth, setFirstInstallmentMonth] =
@@ -65,6 +73,10 @@ export default function NewTransactionPage() {
     setAmount('')
     setCategory('')
     setSubcategory('')
+    setIsNewCategory(false)
+    setNewCategoryName('')
+    setIsNewSubcategory(false)
+    setNewSubcategoryName('')
     setInstallments('1')
     setParcelValues([])
     setFirstInstallmentMonth(() => {
@@ -163,6 +175,32 @@ export default function NewTransactionPage() {
     if (!paymentMethod || !accountId || !amount)
       return
 
+    let finalCategoryId: string | null = category || null
+    let finalSubcategoryId: string | null = subcategory || null
+
+    if (isNewCategory) {
+      const created = await createCategoryWithOptionalSubcategory({
+        name: newCategoryName.trim(),
+        type: kind,
+        subcategoryName:
+          kind === 'SAIDA' && newSubcategoryName.trim()
+            ? newSubcategoryName.trim()
+            : undefined,
+      })
+
+      finalCategoryId = created.categoryId
+      finalSubcategoryId = created.subcategoryId ?? null
+    } else if (isNewSubcategory && kind === 'SAIDA' && category) {
+      const created = await createCategoryWithOptionalSubcategory({
+        name: '',
+        type: kind,
+        subcategoryName: newSubcategoryName.trim(),
+        parentCategoryId: category,
+      })
+
+      finalSubcategoryId = created.subcategoryId ?? null
+    }
+
     if (kind === 'ENTRADA') {
       await createTransaction({
         type: 'ENTRADA',
@@ -170,7 +208,7 @@ export default function NewTransactionPage() {
         amount: Number(amount),
         description,
         destinationAccountId: accountId,
-        categoryId: category || null,
+        categoryId: finalCategoryId,
       })
     }
 
@@ -183,8 +221,8 @@ export default function NewTransactionPage() {
           description,
           originAccountId: accountId,
           paymentMethod: 'CARTAO_CREDITO',
-          categoryId: category || null,
-          subcategoryId: subcategory || null,
+          categoryId: finalCategoryId,
+          subcategoryId: finalSubcategoryId,
           installments: Number(installments),
           firstInstallmentMonth,
           parcelValues: parcelValues.map((v) => Number(v)),
@@ -197,8 +235,8 @@ export default function NewTransactionPage() {
           description,
           originAccountId: accountId,
           paymentMethod: paymentMethod as 'DINHEIRO' | 'CONTA_CORRENTE',
-          categoryId: category || null,
-          subcategoryId: subcategory || null,
+          categoryId: finalCategoryId,
+          subcategoryId: finalSubcategoryId,
         })
       }
     }
@@ -326,66 +364,103 @@ export default function NewTransactionPage() {
           <label>Categoria</label>
           <select
             className="select"
-            value={category}
-            onChange={(e) =>
-              setCategory(
-                e.target.value
-              )
-            }
+            value={isNewCategory ? '__NEW__' : category}
+            onChange={(e) => {
+              const value = e.target.value
+
+              if (value === '__NEW__') {
+                setIsNewCategory(true)
+                setCategory('')
+                setIsNewSubcategory(false)
+                setSubcategory('')
+              } else {
+                setIsNewCategory(false)
+                setCategory(value)
+                setIsNewSubcategory(false)
+                setSubcategory('')
+              }
+            }}
           >
             <option value="">
               Selecione
             </option>
             {categories
-              .filter(
-                (c) => c.type === kind
-              )
+              .filter((c) => c.type === kind)
               .map((c) => (
-                <option
-                  key={c.id}
-                  value={c.id}
-                >
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
+            <option value="__NEW__">
+              -- Nova Categoria --
+            </option>
           </select>
         </div>
 
-        {kind === 'SAIDA' &&
-          category && (
-            <div className="field">
-              <label>
-                Subcategoria
-              </label>
-              <select
-                className="select"
-                value={subcategory}
-                onChange={(e) =>
-                  setSubcategory(
-                    e.target.value
-                  )
+        {isNewCategory && (
+          <div className="field">
+            <label>Nome da nova categoria</label>
+            <input
+              className="input"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+            />
+          </div>
+        )}
+
+        {kind === 'SAIDA' && (category || isNewCategory) && (
+          <div className="field">
+            <label>Subcategoria</label>
+
+            <select
+              className="select"
+              value={
+                isNewSubcategory
+                  ? '__NEW__'
+                  : subcategory
+              }
+              onChange={(e) => {
+                const value = e.target.value
+
+                if (value === '__NEW__') {
+                  setIsNewSubcategory(true)
+                  setSubcategory('')
+                } else {
+                  setIsNewSubcategory(false)
+                  setSubcategory(value)
                 }
-              >
-                <option value="">
-                  Selecione
-                </option>
-                {subcategories
-                  .filter(
-                    (s) =>
-                      s.categoryId ===
-                      category
-                  )
+              }}
+            >
+              <option value="">
+                Selecione
+              </option>
+
+              {!isNewCategory &&
+                subcategories
+                  .filter((s) => s.categoryId === category)
                   .map((s) => (
-                    <option
-                      key={s.id}
-                      value={s.id}
-                    >
+                    <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
-              </select>
-            </div>
-          )}
+
+              <option value="__NEW__">
+                -- Nova Subcategoria --
+              </option>
+            </select>
+
+            {isNewSubcategory && (
+              <input
+                className="input"
+                value={newSubcategoryName}
+                onChange={(e) =>
+                  setNewSubcategoryName(e.target.value)
+                }
+                placeholder="Nome da nova subcategoria"
+              />
+            )}
+          </div>
+        )}
 
         <div className="field">
           <label>Descrição</label>

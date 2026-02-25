@@ -188,8 +188,22 @@ export async function createCategoryWithOptionalSubcategory(params: {
   name: string
   type: CategoryType
   subcategoryName?: string
+  parentCategoryId?: string
 }): Promise<{ categoryId: string; subcategoryId: string | null }> {
-  const { name, type, subcategoryName } = params
+  const { name, type, subcategoryName, parentCategoryId } = params
+
+  // Caso esteja criando apenas uma subcategoria
+  if (parentCategoryId && subcategoryName?.trim().length) {
+    const subcategory = await createSubcategory(
+      subcategoryName,
+      parentCategoryId
+    )
+
+    return {
+      categoryId: parentCategoryId,
+      subcategoryId: subcategory.id,
+    }
+  }
 
   const category = await createCategory(name, type)
 
