@@ -103,6 +103,13 @@ export default function EditTransactionPage() {
           })
           .eq('id', id)
       } else {
+        const { data: userData } = await supabase.auth.getUser()
+        const userId = userData.user?.id
+
+        if (!userId) {
+          throw new Error('Usuário não autenticado')
+        }
+
         await supabase
           .from('compras_cartao')
           .update({
@@ -111,6 +118,7 @@ export default function EditTransactionPage() {
             descricao: description,
             categoria_id: categoryId || null,
             subcategoria_id: subcategoryId || null,
+            numero_parcelas: installments,
           })
           .eq('id', id)
 
@@ -122,6 +130,7 @@ export default function EditTransactionPage() {
           .from('parcelas_cartao')
           .delete()
           .eq('compra_cartao_id', id)
+          .eq('user_id', userId)
 
         if (installments && installments > 0 && firstInstallmentMonth) {
           const [year, month] = firstInstallmentMonth
@@ -137,11 +146,17 @@ export default function EditTransactionPage() {
           }
 
           const newParcels = values.map((value, index) => {
-            const d = new Date(year, month - 1 + index, 1)
+            const calcMonth = month - 1 + index
+            const calcDate = new Date(year, calcMonth, 1)
+
+            const y = calcDate.getFullYear()
+            const m = String(calcDate.getMonth() + 1).padStart(2, '0')
+
             return {
               compra_cartao_id: id,
-              competencia: d.toISOString().slice(0, 10),
+              competencia: `${y}-${m}-01`,
               valor: value,
+              user_id: userId,
             }
           })
 
@@ -291,7 +306,7 @@ export default function EditTransactionPage() {
       </div>
 
       {/* PARCELAMENTO (APENAS CARTÃO) */}
-      {isCardPurchase && installments && (
+      {isCardPurchase ? (
         <>
           <div className="field">
             <label>Número de parcelas</label>
@@ -299,9 +314,17 @@ export default function EditTransactionPage() {
               className="input"
               type="number"
               min={1}
-              value={installments}
+              value={installments ?? ''}
               onChange={(e) => {
-                setInstallments(Number(e.target.value))
+                const val = e.target.value
+                if (val === '') {
+                  setInstallments(null)
+                  setParcelValues([])
+                  return
+                }
+
+                const parsed = Number(val)
+                setInstallments(isNaN(parsed) ? null : parsed)
                 setParcelValues([])
               }}
             />
@@ -319,7 +342,7 @@ export default function EditTransactionPage() {
             />
           </div>
 
-          {parcelValues.map((value, i) => (
+          {installments !== null && installments > 0 && parcelValues.length > 0 && parcelValues.map((value, i) => (
             <div key={i} className="parcel-row">
               <div className="readonly-field">
                 {(() => {
@@ -348,7 +371,7 @@ export default function EditTransactionPage() {
             </div>
           ))}
         </>
-      )}
+      ) : null}
 
       <button className="button" onClick={handleSave}>
         Salvar alterações
