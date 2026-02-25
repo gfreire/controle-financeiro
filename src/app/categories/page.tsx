@@ -29,8 +29,6 @@ export default function CategoriesPage() {
   const [expanded, setExpanded] =
     useState<Record<string, boolean>>({})
 
-  const [hidden, setHidden] =
-    useState<Record<string, boolean>>({})
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,12 +109,6 @@ export default function CategoriesPage() {
     setExpanded(map)
   }
 
-  function toggleHidden(id: string) {
-    setHidden((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
-  }
 
   async function handleDeleteCategory(id: string) {
     const category = categories.find((c) => c.id === id)
@@ -227,15 +219,11 @@ export default function CategoriesPage() {
             const isExpanded =
               expanded[category.id] ?? false
 
-            const isHidden =
-              hidden[category.id] ?? false
 
             return (
               <div key={category.id}>
                 <div
-                  className={`category-row ${
-                    isHidden ? 'is-disabled' : ''
-                  }`}
+                  className="category-row"
                 >
                   <div className="category-left">
                     {activeTab === 'SAIDA' &&
@@ -283,19 +271,6 @@ export default function CategoriesPage() {
                         </button>
                       </>
                     )}
-
-                    <label className="switch">
-                      <input
-                        type="checkbox"
-                        checked={!isHidden}
-                        onChange={() =>
-                          toggleHidden(
-                            category.id
-                          )
-                        }
-                      />
-                      <span className="slider" />
-                    </label>
                   </div>
                 </div>
 
@@ -304,15 +279,10 @@ export default function CategoriesPage() {
                   subs.length > 0 && (
                     <div className="subcategory-list">
                       {subs.map((sub) => {
-                        const subHidden =
-                          hidden[sub.id] ?? false
-
                         return (
                           <div
                             key={sub.id}
-                            className={`subcategory-row ${
-                              subHidden ? 'is-disabled' : ''
-                            }`}
+                            className="subcategory-row"
                           >
                             <span>
                               {sub.name}
@@ -338,19 +308,6 @@ export default function CategoriesPage() {
                                   </button>
                                 </>
                               )}
-
-                              <label className="switch">
-                                <input
-                                  type="checkbox"
-                                  checked={!subHidden}
-                                  onChange={() =>
-                                    toggleHidden(
-                                      sub.id
-                                    )
-                                  }
-                                />
-                                <span className="slider" />
-                              </label>
                             </div>
                           </div>
                         )

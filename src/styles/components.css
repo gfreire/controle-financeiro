@@ -73,10 +73,6 @@
   flex-shrink: 0;
 }
 
-.is-disabled {
-  opacity: 0.5;
-  background-color: #f5f6f8;
-}
 
 /* =========================
    EMPTY STATE
