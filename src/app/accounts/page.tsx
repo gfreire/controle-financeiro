@@ -6,6 +6,15 @@ import { listAccounts, disableAccount } from '@/services/accounts.service'
 import { Account } from '@/domain/account'
 import { accountTypeBadges } from '@/utils/accountTypeUI'
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
 const accountTypeOrder: Record<string, number> = {
   DINHEIRO: 1,
   CONTA_CORRENTE: 2,
@@ -112,11 +121,23 @@ export default function AccountsPage() {
                   ? (() => {
                       const total = account.creditLimit ?? 0
                       const available = account.availableLimit ?? total
-                      const used = total - available
+                      const used =
+                        account.currentBalance ??
+                        total - available
 
-                      return `R$ ${used} / R$ ${total} (R$ ${available})`
+                      return `${formatCurrency(
+                        used
+                      )} / ${formatCurrency(
+                        total
+                      )} (${formatCurrency(
+                        available
+                      )})`
                     })()
-                  : `R$ ${account.currentBalance ?? account.initialBalance}`}
+                  : formatCurrency(
+                      account.currentBalance ??
+                        account.initialBalance ??
+                        0
+                    )}
               </span>
             </div>
 

@@ -1,12 +1,16 @@
 export function formatCurrency(
-  value: number | null
+  value: number | null | undefined
 ): string {
-  if (value === null) {
+  const numericValue = Number(value ?? 0)
+
+  if (Number.isNaN(numericValue)) {
     return 'R$ 0,00'
   }
 
-  return value.toLocaleString('pt-BR', {
+  return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  })
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericValue)
 }

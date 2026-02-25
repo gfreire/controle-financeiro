@@ -90,11 +90,13 @@ export async function listAccounts(): Promise<Account[]> {
         .eq('compras_cartao.conta_cartao_id', account.id)
         .eq('compras_cartao.user_id', userId)
 
-      const used = (parcelas ?? []).reduce(
+      const usedRaw = (parcelas ?? []).reduce(
         (sum: Decimal, p: ValorRow) =>
           sum.plus(new Decimal(p.valor ?? 0)),
         new Decimal(0)
       )
+
+      const used = usedRaw.toDecimalPlaces(2)
 
       const totalLimit = new Decimal(account.creditLimit ?? 0)
 
@@ -102,6 +104,8 @@ export async function listAccounts(): Promise<Account[]> {
         .minus(used)
         .toDecimalPlaces(2)
         .toNumber()
+
+      account.currentBalance = used.toNumber()
     } else {
       // Entradas
       const { data: entradas } = await supabase
