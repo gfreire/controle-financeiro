@@ -4,49 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { listTimeline, deleteTransaction } from '@/services/transactions.service'
 import { TimelineItem } from '@/domain/transaction'
-
-function formatCurrency(value: number) {
-  return value.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  })
-}
-
-function formatDate(date: string) {
-  const d = new Date(date)
-  return d.toLocaleDateString('pt-BR')
-}
-
-function formatMonthLabel(ym: string) {
-  const [year, month] = ym.split('-').map(Number)
-  const d = new Date(year, month - 1, 1)
-  return d.toLocaleDateString('pt-BR', {
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function getInstallmentRange(competence: string, installments: number) {
-  const [year, month] = competence.split('-').map(Number)
-
-  const start = new Date(year, month - 1, 1)
-
-  const formatter = new Intl.DateTimeFormat('pt-BR', {
-    month: 'short',
-  })
-
-  const startLabel = formatter.format(start).replace('.', '')
-
-  // Se for apenas 1 parcela, exibe somente o mês inicial
-  if (installments === 1) {
-    return startLabel
-  }
-
-  const end = new Date(year, month - 1 + installments - 1, 1)
-  const endLabel = formatter.format(end).replace('.', '')
-
-  return `${startLabel}-${endLabel}`
-}
+import { formatCurrency } from '@/utils/formatCurrency'
+import {
+  formatDate,
+  formatMonthLabel,
+  getInstallmentRange,
+} from '@/utils/dateFormat'
 
 export default function TransactionsPage() {
   const [items, setItems] = useState<TimelineItem[]>([])
