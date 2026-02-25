@@ -13,6 +13,10 @@ export type Account = {
   initialBalance: number | null
   creditLimit: number | null
 
+  // Valores calculados dinamicamente pelo service
+  currentBalance?: number
+  availableLimit?: number
+
   active: boolean
   createdAt: string
 }

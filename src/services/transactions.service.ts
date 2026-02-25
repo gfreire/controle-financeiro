@@ -4,6 +4,7 @@ import {
   validateCreateTransaction,
 } from '@/domain/transaction'
 import { TimelineItem } from '@/domain/transaction'
+import Decimal from 'decimal.js'
 
 export async function createTransaction(
   input: CreateTransactionInput
@@ -146,13 +147,15 @@ async function createCardPurchase(
   }
 
   const totalFromParcels = parcelValues.reduce(
-    (sum, v) => sum + v,
-    0
+    (sum: Decimal, v) => sum.plus(new Decimal(v)),
+    new Decimal(0)
   )
 
-  const diff = Math.abs(totalFromParcels - amount)
+  const diff = totalFromParcels
+    .minus(new Decimal(amount))
+    .abs()
 
-  if (diff > 0.01) {
+  if (diff.greaterThan(new Decimal(0.01))) {
     throw new Error(
       'Soma das parcelas diferente do valor total'
     )
@@ -220,7 +223,7 @@ type DBTimelineRow = {
   id: string
   type: 'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA'
   description: string | null
-  amount: number
+  amount: number | string
   date: string
   competence: string | null
 
@@ -241,7 +244,7 @@ function mapTimelineRow(row: DBTimelineRow): TimelineItem {
     id: row.id,
     type: row.type,
     description: row.description,
-    amount: row.amount,
+    amount: new Decimal(row.amount ?? 0).toDecimalPlaces(2).toNumber(),
     date: row.date,
     competence: row.competence,
     originAccountName: row.origin_account_name,

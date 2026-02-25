@@ -109,8 +109,14 @@ export default function AccountsPage() {
 
               <span className="muted">
                 {account.type === 'CARTAO_CREDITO'
-                  ? `Limite: R$ ${account.creditLimit}`
-                  : `Saldo: R$ ${account.initialBalance}`}
+                  ? (() => {
+                      const total = account.creditLimit ?? 0
+                      const available = account.availableLimit ?? total
+                      const used = total - available
+
+                      return `R$ ${used} / R$ ${total} (R$ ${available})`
+                    })()
+                  : `R$ ${account.currentBalance ?? account.initialBalance}`}
               </span>
             </div>
 
