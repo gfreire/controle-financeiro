@@ -181,6 +181,48 @@ export async function createSubcategory(
 }
 
 /* =========================
+   CREATE CATEGORY WITH OPTIONAL SUBCATEGORY
+========================= */
+
+export async function createCategoryWithOptionalSubcategory(params: {
+  name: string
+  type: CategoryType
+  subcategoryName?: string
+}): Promise<{ categoryId: string; subcategoryId: string | null }> {
+  const { name, type, subcategoryName } = params
+
+  const category = await createCategory(name, type)
+
+  let subcategoryId: string | null = null
+
+  if (subcategoryName && subcategoryName.trim().length >= 2) {
+    const subcategory = await createSubcategory(
+      subcategoryName,
+      category.id
+    )
+    subcategoryId = subcategory.id
+  }
+
+  return {
+    categoryId: category.id,
+    subcategoryId,
+  }
+}
+
+/* =========================
+   CREATE SUBCATEGORY FOR EXISTING CATEGORY
+========================= */
+
+export async function createSubcategoryForExistingCategory(
+  name: string,
+  categoryId: string
+): Promise<Subcategory> {
+  // Apenas delega para createSubcategory,
+  // mantendo separação semântica de domínio
+  return createSubcategory(name, categoryId)
+}
+
+/* =========================
    GET CATEGORY BY ID
 ========================= */
 

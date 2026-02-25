@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { listCategories, listSubcategories } from '@/services/categories.service'
+import { 
+  listCategories, 
+  listSubcategories, 
+  createCategoryWithOptionalSubcategory,
+  createSubcategoryForExistingCategory
+} from '@/services/categories.service'
 import { Category, Subcategory } from '@/domain/category'
 
 export default function EditTransactionPage() {
@@ -18,6 +23,10 @@ export default function EditTransactionPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
+  const [isNewCategory, setIsNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newSubcategoryName, setNewSubcategoryName] = useState('')
+  const [isNewSubcategory, setIsNewSubcategory] = useState(false)
   const [type, setType] = useState<'ENTRADA' | 'SAIDA' | 'TRANSFERENCIA'>('SAIDA')
   const [isCardPurchase, setIsCardPurchase] = useState(false)
   const [installments, setInstallments] = useState<number | null>(null)
@@ -91,6 +100,43 @@ export default function EditTransactionPage() {
 
   async function handleSave() {
     try {
+      let finalCategoryId: string | null = categoryId || null
+      let finalSubcategoryId: string | null = subcategoryId || null
+
+      if (isNewCategory) {
+        if (type === 'TRANSFERENCIA') {
+          throw new Error('Transferência não pode ter categoria')
+        }
+
+        const created = await createCategoryWithOptionalSubcategory({
+          name: newCategoryName,
+          type: type as 'ENTRADA' | 'SAIDA',
+          subcategoryName:
+            type === 'SAIDA' && newSubcategoryName.trim().length > 0
+              ? newSubcategoryName
+              : undefined,
+        })
+
+        finalCategoryId = created.categoryId
+        finalSubcategoryId = created.subcategoryId ?? null
+      }
+
+      if (
+        !isNewCategory &&
+        type === 'SAIDA' &&
+        categoryId &&
+        newSubcategoryName.trim().length > 0 &&
+        !subcategoryId
+      ) {
+        const createdSub = await createSubcategoryForExistingCategory(
+          newSubcategoryName,
+          categoryId
+        )
+
+        finalCategoryId = categoryId
+        finalSubcategoryId = createdSub.id
+      }
+
       if (!isCardPurchase) {
         await supabase
           .from('movimentacoes')
@@ -98,8 +144,8 @@ export default function EditTransactionPage() {
             valor: Number(amount),
             data: date,
             descricao: description,
-            categoria_id: categoryId || null,
-            subcategoria_id: subcategoryId || null,
+            categoria_id: finalCategoryId || null,
+            subcategoria_id: finalSubcategoryId || null,
           })
           .eq('id', id)
       } else {
@@ -116,8 +162,8 @@ export default function EditTransactionPage() {
             valor_total: Number(amount),
             data_compra: date,
             descricao: description,
-            categoria_id: categoryId || null,
-            subcategoria_id: subcategoryId || null,
+            categoria_id: finalCategoryId || null,
+            subcategoria_id: finalSubcategoryId || null,
             numero_parcelas: installments,
           })
           .eq('id', id)
@@ -172,14 +218,6 @@ export default function EditTransactionPage() {
     } catch {
       alert('Erro ao salvar')
     }
-  }
-
-  function formatMonthYear(year: number, month: number) {
-    const date = new Date(year, month - 1, 1)
-    return date.toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric',
-    })
   }
 
   function updateParcel(index: number, value: string) {
@@ -249,8 +287,20 @@ export default function EditTransactionPage() {
           className="select"
           value={categoryId}
           onChange={(e) => {
-            setCategoryId(e.target.value)
+            const value = e.target.value
+
+            if (value === '__NEW__') {
+              setIsNewCategory(true)
+              setCategoryId('')
+              setSubcategoryId('')
+              return
+            }
+
+            setIsNewCategory(false)
+            setCategoryId(value)
             setSubcategoryId('')
+            setIsNewSubcategory(false)
+            setNewSubcategoryName('')
           }}
         >
           <option value="">Selecione</option>
@@ -261,8 +311,33 @@ export default function EditTransactionPage() {
                 {c.name}
               </option>
             ))}
+          <option value="__NEW__">-- Nova categoria --</option>
         </select>
       </div>
+
+      {isNewCategory && (
+        <>
+          <div className="field">
+            <label>Nova categoria</label>
+            <input
+              className="input"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+            />
+          </div>
+
+          {type === 'SAIDA' && (
+            <div className="field">
+              <label>Subcategoria (opcional)</label>
+              <input
+                className="input"
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       {type === 'SAIDA' && categoryId && (
         <div className="field">
@@ -270,7 +345,18 @@ export default function EditTransactionPage() {
           <select
             className="select"
             value={subcategoryId}
-            onChange={(e) => setSubcategoryId(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value
+
+              if (value === '__NEW_SUB__') {
+                setIsNewSubcategory(true)
+                setSubcategoryId('')
+                return
+              }
+
+              setIsNewSubcategory(false)
+              setSubcategoryId(value)
+            }}
           >
             <option value="">Selecione</option>
             {subcategories
@@ -280,7 +366,19 @@ export default function EditTransactionPage() {
                   {s.name}
                 </option>
               ))}
+            <option value="__NEW_SUB__">-- Nova subcategoria --</option>
           </select>
+        </div>
+      )}
+
+      {type === 'SAIDA' && categoryId && isNewSubcategory && (
+        <div className="field">
+          <label>Nova subcategoria</label>
+          <input
+            className="input"
+            value={newSubcategoryName}
+            onChange={(e) => setNewSubcategoryName(e.target.value)}
+          />
         </div>
       )}
 
