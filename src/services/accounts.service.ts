@@ -272,3 +272,141 @@ export async function disableAccount(
     throw new Error(error.message)
   }
 }
+
+export async function testAccountImpact(
+  accountId: string,
+  amount: number,
+  options?: {
+    excludeMovimentacaoId?: string
+    excludeCompraCartaoId?: string
+  }
+): Promise<{
+  type: AccountType
+  willExceed: boolean
+  available: number
+}> {
+  const userId = await getUserId()
+
+  const { data: accountData, error } = await supabase
+    .from('contas')
+    .select('*')
+    .eq('id', accountId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !accountData) {
+    throw new Error('Conta não encontrada')
+  }
+
+  const account = mapDbAccountToDomain(accountData)
+
+  const value = new Decimal(amount)
+
+  const excludeMovimentacaoId = options?.excludeMovimentacaoId
+  const excludeCompraCartaoId = options?.excludeCompraCartaoId
+
+  // CARTÃO DE CRÉDITO
+  if (account.type === 'CARTAO_CREDITO') {
+    let parcelasQuery = supabase
+      .from('parcelas_cartao')
+      .select('valor, compra_cartao_id, compras_cartao!inner(conta_cartao_id, user_id)')
+      .eq('compras_cartao.conta_cartao_id', account.id)
+      .eq('compras_cartao.user_id', userId)
+
+    if (excludeCompraCartaoId) {
+      parcelasQuery = parcelasQuery.neq('compra_cartao_id', excludeCompraCartaoId)
+    }
+
+    const { data: parcelas } = await parcelasQuery
+
+    const used = (parcelas ?? []).reduce(
+      (sum: Decimal, p: ValorRow) =>
+        sum.plus(new Decimal(p.valor ?? 0)),
+      new Decimal(0)
+    )
+
+    const totalLimit = new Decimal(account.creditLimit ?? 0)
+    const available = totalLimit.minus(used)
+
+    return {
+      type: account.type,
+      willExceed: value.greaterThan(available),
+      available: available.toDecimalPlaces(2).toNumber(),
+    }
+  }
+
+  // CONTAS NÃO CARTÃO
+  const { data: entradas } = await supabase
+    .from('movimentacoes')
+    .select('valor')
+    .eq('conta_destino_id', account.id)
+    .eq('user_id', userId)
+    .eq('tipo', 'ENTRADA')
+
+  let saidasQuery = supabase
+    .from('movimentacoes')
+    .select('id, valor')
+    .eq('conta_origem_id', account.id)
+    .eq('user_id', userId)
+    .eq('tipo', 'SAIDA')
+
+  if (excludeMovimentacaoId) {
+    saidasQuery = saidasQuery.neq('id', excludeMovimentacaoId)
+  }
+
+  const { data: saidas } = await saidasQuery
+
+  const { data: transfSaida } = await supabase
+    .from('movimentacoes')
+    .select('valor')
+    .eq('conta_origem_id', account.id)
+    .eq('user_id', userId)
+    .eq('tipo', 'TRANSFERENCIA')
+
+  const { data: transfEntrada } = await supabase
+    .from('movimentacoes')
+    .select('valor')
+    .eq('conta_destino_id', account.id)
+    .eq('user_id', userId)
+    .eq('tipo', 'TRANSFERENCIA')
+
+  const totalEntradas = (entradas ?? []).reduce(
+    (sum: Decimal, m: ValorRow) =>
+      sum.plus(new Decimal(m.valor ?? 0)),
+    new Decimal(0)
+  )
+
+  const totalSaidas = (saidas ?? []).reduce(
+    (sum: Decimal, m: ValorRow) =>
+      sum.plus(new Decimal(m.valor ?? 0)),
+    new Decimal(0)
+  )
+
+  const totalTransfSaida = (transfSaida ?? []).reduce(
+    (sum: Decimal, m: ValorRow) =>
+      sum.plus(new Decimal(m.valor ?? 0)),
+    new Decimal(0)
+  )
+
+  const totalTransfEntrada = (transfEntrada ?? []).reduce(
+    (sum: Decimal, m: ValorRow) =>
+      sum.plus(new Decimal(m.valor ?? 0)),
+    new Decimal(0)
+  )
+
+  const saldoInicial = new Decimal(account.initialBalance ?? 0)
+
+  const saldoAtual = saldoInicial
+    .plus(totalEntradas)
+    .minus(totalSaidas)
+    .minus(totalTransfSaida)
+    .plus(totalTransfEntrada)
+
+  const saldoApos = saldoAtual.minus(value)
+
+  return {
+    type: account.type,
+    willExceed: saldoApos.lessThan(0),
+    available: saldoAtual.toDecimalPlaces(2).toNumber(),
+  }
+}

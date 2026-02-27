@@ -11,6 +11,9 @@ import {
   createSubcategoryForExistingCategory
 } from '@/services/categories.service'
 import { Category, Subcategory } from '@/domain/category'
+import { normalizeText } from '@/utils/normalize'
+import { testAccountImpact } from '@/services/accounts.service'
+import { formatCurrency } from '@/utils/formatCurrency'
 
 export default function EditTransactionPage() {
   const [amount, setAmount] = useState('')
@@ -32,6 +35,7 @@ export default function EditTransactionPage() {
   const [installments, setInstallments] = useState<number | null>(null)
   const [firstInstallmentMonth, setFirstInstallmentMonth] = useState('')
   const [parcelValues, setParcelValues] = useState<string[]>([])
+  const [limitMessage, setLimitMessage] = useState<string | null>(null)
 
   const { id } = useParams<{ id: string }>()
 
@@ -100,6 +104,10 @@ export default function EditTransactionPage() {
 
   async function handleSave() {
     try {
+      const normalizedDescription = normalizeText(description) ?? ''
+      const normalizedNewCategory = normalizeText(newCategoryName)
+      const normalizedNewSubcategory = normalizeText(newSubcategoryName)
+
       let finalCategoryId: string | null = categoryId || null
       let finalSubcategoryId: string | null = subcategoryId || null
 
@@ -109,11 +117,11 @@ export default function EditTransactionPage() {
         }
 
         const created = await createCategoryWithOptionalSubcategory({
-          name: newCategoryName,
+          name: normalizedNewCategory ?? '',
           type: type as 'ENTRADA' | 'SAIDA',
           subcategoryName:
-            type === 'SAIDA' && newSubcategoryName.trim().length > 0
-              ? newSubcategoryName
+            type === 'SAIDA' && (normalizedNewSubcategory?.length ?? 0) > 0
+              ? normalizedNewSubcategory ?? undefined
               : undefined,
         })
 
@@ -125,11 +133,11 @@ export default function EditTransactionPage() {
         !isNewCategory &&
         type === 'SAIDA' &&
         categoryId &&
-        newSubcategoryName.trim().length > 0 &&
+        (normalizedNewSubcategory?.length ?? 0) > 0 &&
         !subcategoryId
       ) {
         const createdSub = await createSubcategoryForExistingCategory(
-          newSubcategoryName,
+          normalizedNewSubcategory ?? '',
           categoryId
         )
 
@@ -138,12 +146,40 @@ export default function EditTransactionPage() {
       }
 
       if (!isCardPurchase) {
+        const { data: existing } = await supabase
+          .from('movimentacoes')
+          .select('conta_origem_id, tipo')
+          .eq('id', id)
+          .single()
+
+        if (existing?.tipo === 'SAIDA' && existing.conta_origem_id) {
+          const impact = await testAccountImpact(
+            existing.conta_origem_id,
+            Number(amount),
+            { excludeMovimentacaoId: id }
+          )
+
+          if (impact.type === 'DINHEIRO' && impact.willExceed) {
+            setLimitMessage(
+              `Saldo insuficiente. Disponível: ${formatCurrency(impact.available)}`
+            )
+            return
+          }
+          
+          if (impact.type === 'CONTA_CORRENTE' && impact.willExceed) {
+            setLimitMessage(
+              `Atenção: saldo ficará negativo. Disponível atual: ${formatCurrency(impact.available)}`
+            )
+            return
+          }
+        }
+
         await supabase
           .from('movimentacoes')
           .update({
             valor: Number(amount),
             data: date,
-            descricao: description,
+            descricao: normalizedDescription,
             categoria_id: finalCategoryId || null,
             subcategoria_id: finalSubcategoryId || null,
           })
@@ -156,12 +192,33 @@ export default function EditTransactionPage() {
           throw new Error('Usuário não autenticado')
         }
 
+        const { data: existingCard } = await supabase
+          .from('compras_cartao')
+          .select('conta_cartao_id')
+          .eq('id', id)
+          .single()
+
+        if (existingCard?.conta_cartao_id) {
+          const impact = await testAccountImpact(
+            existingCard.conta_cartao_id,
+            Number(amount),
+            { excludeCompraCartaoId: id }
+          )
+
+          if (impact.willExceed) {
+            setLimitMessage(
+              `Limite insuficiente. Disponível: ${formatCurrency(impact.available)}`
+            )
+            return
+          }
+        }
+
         await supabase
           .from('compras_cartao')
           .update({
             valor_total: Number(amount),
             data_compra: date,
-            descricao: description,
+            descricao: normalizedDescription,
             categoria_id: finalCategoryId || null,
             subcategoria_id: finalSubcategoryId || null,
             numero_parcelas: installments,
@@ -216,7 +273,7 @@ export default function EditTransactionPage() {
 
       window.location.href = '/transactions'
     } catch {
-      alert('Erro ao salvar')
+      setLimitMessage('Erro ao salvar')
     }
   }
 
@@ -474,6 +531,22 @@ export default function EditTransactionPage() {
       <button className="button" onClick={handleSave}>
         Salvar alterações
       </button>
+      {limitMessage && (
+        <div className="success-overlay">
+          <div className="success-box">
+            <p>{limitMessage}</p>
+            <div className="overlay-actions">
+              <button
+                type="button"
+                className="button"
+                onClick={() => setLimitMessage(null)}
+              >
+                Ok
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

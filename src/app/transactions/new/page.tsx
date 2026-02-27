@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { listAccounts } from '@/services/accounts.service'
+import { listAccounts, testAccountImpact } from '@/services/accounts.service'
 import { 
   listCategories, 
   listSubcategories,
@@ -11,6 +11,8 @@ import {
 import { createTransaction } from '@/services/transactions.service'
 import { Account } from '@/domain/account'
 import { Category, Subcategory } from '@/domain/category'
+import { normalizeText } from '@/utils/normalize'
+import { formatCurrency } from '@/utils/formatCurrency'
 
 type TransactionKind = 'ENTRADA' | 'SAIDA'
 type PaymentMethod =
@@ -64,6 +66,8 @@ export default function NewTransactionPage() {
 
   const [parcelValues, setParcelValues] = useState<string[]>([])
   const [success, setSuccess] = useState(false)
+  const [limitError, setLimitError] = useState<string | null>(null)
+  const [pendingSubmit, setPendingSubmit] = useState(false)
   function resetForm() {
     setDate(today)
     setKind('SAIDA')
@@ -175,38 +179,86 @@ export default function NewTransactionPage() {
     if (!paymentMethod || !accountId || !amount)
       return
 
+    setLimitError(null)
+
+    const numericAmount = Number(amount)
+
+    // ===== LIMIT VALIDATION =====
+    const impact = await testAccountImpact(
+      accountId,
+      numericAmount
+    )
+
+    if (kind === 'SAIDA') {
+      if (impact.type === 'DINHEIRO' && impact.willExceed) {
+        setLimitError(
+          `Saldo insuficiente. Disponível: ${formatCurrency(impact.available)}`
+        )
+        return
+      }
+
+      if (
+        impact.type === 'CARTAO_CREDITO' &&
+        impact.willExceed
+      ) {
+        setLimitError(
+          `Limite insuficiente. Disponível: ${formatCurrency(impact.available)}`
+        )
+        return
+      }
+
+      if (
+        impact.type === 'CONTA_CORRENTE' &&
+        impact.willExceed &&
+        !pendingSubmit
+      ) {
+        setLimitError(
+          `Atenção: saldo ficará negativo. Disponível atual: ${formatCurrency(impact.available)}`
+        )
+        setPendingSubmit(true)
+        return
+      }
+    }
+
     let finalCategoryId: string | null = category || null
     let finalSubcategoryId: string | null = subcategory || null
 
     if (isNewCategory) {
       const created = await createCategoryWithOptionalSubcategory({
-        name: newCategoryName.trim(),
+        name: normalizeText(newCategoryName) ?? '',
         type: kind,
         subcategoryName:
-          kind === 'SAIDA' && newSubcategoryName.trim()
-            ? newSubcategoryName.trim()
+          kind === 'SAIDA' && normalizeText(newSubcategoryName)
+            ? normalizeText(newSubcategoryName) ?? undefined
             : undefined,
       })
 
       finalCategoryId = created.categoryId
       finalSubcategoryId = created.subcategoryId ?? null
-    } else if (isNewSubcategory && kind === 'SAIDA' && category) {
+    } else if (
+      isNewSubcategory &&
+      kind === 'SAIDA' &&
+      category
+    ) {
       const created = await createCategoryWithOptionalSubcategory({
         name: '',
         type: kind,
-        subcategoryName: newSubcategoryName.trim(),
+        subcategoryName:
+          normalizeText(newSubcategoryName) ?? undefined,
         parentCategoryId: category,
       })
 
       finalSubcategoryId = created.subcategoryId ?? null
     }
 
+    const normalizedDescription = normalizeText(description) ?? undefined
+
     if (kind === 'ENTRADA') {
       await createTransaction({
         type: 'ENTRADA',
         date,
-        amount: Number(amount),
-        description,
+        amount: numericAmount,
+        description: normalizedDescription,
         destinationAccountId: accountId,
         categoryId: finalCategoryId,
       })
@@ -217,8 +269,8 @@ export default function NewTransactionPage() {
         await createTransaction({
           type: 'SAIDA',
           date,
-          amount: Number(amount),
-          description,
+          amount: numericAmount,
+          description: normalizedDescription,
           originAccountId: accountId,
           paymentMethod: 'CARTAO_CREDITO',
           categoryId: finalCategoryId,
@@ -231,16 +283,18 @@ export default function NewTransactionPage() {
         await createTransaction({
           type: 'SAIDA',
           date,
-          amount: Number(amount),
-          description,
+          amount: numericAmount,
+          description: normalizedDescription,
           originAccountId: accountId,
-          paymentMethod: paymentMethod as 'DINHEIRO' | 'CONTA_CORRENTE',
+          paymentMethod:
+            paymentMethod as 'DINHEIRO' | 'CONTA_CORRENTE',
           categoryId: finalCategoryId,
           subcategoryId: finalSubcategoryId,
         })
       }
     }
 
+    setPendingSubmit(false)
     resetForm()
     setSuccess(true)
     setTimeout(() => {
@@ -254,6 +308,44 @@ export default function NewTransactionPage() {
         <div className="success-overlay">
           <div className="success-box">
             Registro salvo com sucesso
+          </div>
+        </div>
+      )}
+      {limitError && (
+        <div className="success-overlay">
+          <div className="success-box">
+            <p>{limitError}</p>
+            {pendingSubmit ? (
+              <div className="overlay-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => handleSubmit({ preventDefault: () => {} } as unknown as React.FormEvent)}
+                >
+                  Confirmar mesmo assim
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setLimitError(null)
+                    setPendingSubmit(false)
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <div className="overlay-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setLimitError(null)}
+                >
+                  Ok
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

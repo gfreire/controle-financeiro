@@ -604,6 +604,14 @@ button.link.danger:hover {
   animation: scaleIn 0.2s ease-out;
 }
 
+.overlay-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
