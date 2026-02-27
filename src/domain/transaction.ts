@@ -80,13 +80,12 @@ type BaseInput = {
   amount: number
   date: string
   description?: string
-  categoryId?: string | null
-  subcategoryId?: string | null
 }
 
 export type CreateIncomeInput = BaseInput & {
   type: 'ENTRADA'
   destinationAccountId: string
+  categoryId?: string | null
 }
 
 export type CreateExpenseInput =
@@ -94,6 +93,8 @@ export type CreateExpenseInput =
       type: 'SAIDA'
       paymentMethod: 'DINHEIRO' | 'CONTA_CORRENTE'
       originAccountId: string
+      categoryId?: string | null
+      subcategoryId?: string | null
     })
   | (BaseInput & {
       type: 'SAIDA'
@@ -102,6 +103,8 @@ export type CreateExpenseInput =
       installments: number
       firstInstallmentMonth: string
       parcelValues: number[]
+      categoryId?: string | null
+      subcategoryId?: string | null
     })
 
 export type CreateTransferInput = BaseInput & {
@@ -145,6 +148,10 @@ export function validateCreateTransaction(
     throw new Error('Data é obrigatória')
   }
 
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    throw new Error('Data deve estar no formato YYYY-MM-DD')
+  }
+
   if (input.amount <= 0) {
     throw new Error('Valor deve ser maior que zero')
   }
@@ -174,6 +181,17 @@ export function validateCreateTransaction(
         input.parcelValues.length !== input.installments
       ) {
         throw new Error('Parcelas inconsistentes')
+      }
+
+      const totalParcelas = input.parcelValues.reduce(
+        (acc, v) => acc + v,
+        0
+      )
+
+      const diff = Math.abs(totalParcelas - input.amount)
+
+      if (diff > 0.01) {
+        throw new Error('Soma das parcelas diferente do valor total')
       }
     }
   }
