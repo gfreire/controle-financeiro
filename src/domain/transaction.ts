@@ -111,6 +111,26 @@ export type CreateTransferInput = BaseInput & {
 }
 
 /* =========================
+   UPDATE INPUT
+========================= */
+
+export type UpdateTransactionInput =
+  | (CreateIncomeInput & { id: string })
+  | (CreateExpenseInput & { id: string })
+  | (CreateTransferInput & { id: string })
+
+export function validateUpdateTransaction(
+  input: UpdateTransactionInput
+) {
+  if (!input.id) {
+    throw new Error('Id da transação é obrigatório')
+  }
+
+  // reaproveita validação base
+  validateCreateTransaction(input)
+}
+
+/* =========================
    VALIDATION
 ========================= */
 

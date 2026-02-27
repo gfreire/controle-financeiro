@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase'
 import {
   CreateTransactionInput,
+  UpdateTransactionInput,
   validateCreateTransaction,
+  validateUpdateTransaction,
 } from '@/domain/transaction'
 import { TimelineItem } from '@/domain/transaction'
 import Decimal from 'decimal.js'
@@ -278,6 +280,216 @@ export async function listTimeline(): Promise<TimelineItem[]> {
 /* =========================
    DELETE TRANSACTION
 ========================= */
+
+export async function getTransactionById(id: string) {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+  if (!userId) throw new Error('Usuário não autenticado')
+
+  // 1️⃣ Try movimentacoes first
+  const { data: mov } = await supabase
+    .from('movimentacoes')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (mov) {
+    return {
+      id: mov.id,
+      type: mov.tipo,
+      date: mov.data,
+      amount: Number(mov.valor),
+      description: mov.descricao ?? undefined,
+      originAccountId: mov.conta_origem_id ?? undefined,
+      destinationAccountId: mov.conta_destino_id ?? undefined,
+      categoryId: mov.categoria_id ?? undefined,
+      subcategoryId: mov.subcategoria_id ?? undefined,
+      paymentMethod:
+        mov.tipo === 'SAIDA' ? 'DINHEIRO' : undefined,
+    }
+  }
+
+  // 2️⃣ Try compras_cartao
+  const { data: purchase } = await supabase
+    .from('compras_cartao')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (purchase) {
+    const { data: parcelas } = await supabase
+      .from('parcelas_cartao')
+      .select('*')
+      .eq('compra_cartao_id', id)
+      .eq('user_id', userId)
+      .order('competencia', { ascending: true })
+
+    return {
+      id: purchase.id,
+      type: 'SAIDA',
+      date: purchase.data_compra,
+      amount: Number(purchase.valor_total),
+      description: purchase.descricao ?? undefined,
+      originAccountId: purchase.conta_cartao_id,
+      categoryId: purchase.categoria_id ?? undefined,
+      subcategoryId: purchase.subcategoria_id ?? undefined,
+      paymentMethod: 'CARTAO_CREDITO',
+      installments: purchase.numero_parcelas,
+      firstInstallmentMonth:
+        parcelas && parcelas.length > 0
+          ? parcelas[0].competencia.slice(0, 7)
+          : undefined,
+      parcelValues: parcelas
+        ? parcelas.map((p) => Number(p.valor))
+        : [],
+    }
+  }
+
+  throw new Error('Transação não encontrada')
+}
+
+export async function updateTransaction(
+  input: UpdateTransactionInput
+): Promise<void> {
+  validateUpdateTransaction(input)
+
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+  if (!userId) throw new Error('Usuário não autenticado')
+
+  const { id, type } = input
+
+  if (type === 'ENTRADA') {
+    const { error } = await supabase
+      .from('movimentacoes')
+      .update({
+        valor: input.amount,
+        data: input.date,
+        descricao: normalizeText(input.description),
+        conta_destino_id: input.destinationAccountId,
+        categoria_id: input.categoryId ?? null,
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (error) throw new Error('Erro ao atualizar entrada')
+    return
+  }
+
+  if (type === 'SAIDA' && input.paymentMethod !== 'CARTAO_CREDITO') {
+    const { error } = await supabase
+      .from('movimentacoes')
+      .update({
+        valor: input.amount,
+        data: input.date,
+        descricao: normalizeText(input.description),
+        conta_origem_id: input.originAccountId,
+        categoria_id: input.categoryId ?? null,
+        subcategoria_id: input.subcategoryId ?? null,
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (error) throw new Error('Erro ao atualizar saída')
+    return
+  }
+
+  if (type === 'SAIDA' && input.paymentMethod === 'CARTAO_CREDITO') {
+    const {
+      amount,
+      date,
+      description,
+      originAccountId,
+      categoryId,
+      subcategoryId,
+      installments,
+      firstInstallmentMonth,
+      parcelValues,
+    } = input
+
+    const { error: updateError } = await supabase
+      .from('compras_cartao')
+      .update({
+        valor_total: amount,
+        data_compra: date,
+        descricao: normalizeText(description) ?? '',
+        numero_parcelas: installments,
+        conta_cartao_id: originAccountId,
+        categoria_id: categoryId ?? null,
+        subcategoria_id: subcategoryId ?? null,
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      throw new Error('Erro ao atualizar compra no cartão')
+    }
+
+    await supabase
+      .from('parcelas_cartao')
+      .delete()
+      .eq('compra_cartao_id', id)
+      .eq('user_id', userId)
+
+    if (
+      installments &&
+      installments > 0 &&
+      firstInstallmentMonth &&
+      parcelValues
+    ) {
+      const [year, month] = firstInstallmentMonth
+        .split('-')
+        .map(Number)
+
+      const parcels = parcelValues.map((value, index) => {
+        const competence = new Date(
+          year,
+          month - 1 + index,
+          1
+        )
+
+        const formatted = `${competence.getFullYear()}-${String(
+          competence.getMonth() + 1
+        ).padStart(2, '0')}-01`
+
+        return {
+          compra_cartao_id: id,
+          competencia: formatted,
+          valor: value,
+          user_id: userId,
+        }
+      })
+
+      const { error: parcelError } = await supabase
+        .from('parcelas_cartao')
+        .insert(parcels)
+
+      if (parcelError) {
+        throw new Error('Erro ao atualizar parcelas')
+      }
+    }
+
+    return
+  }
+
+  if (type === 'TRANSFERENCIA') {
+    const { error } = await supabase
+      .from('movimentacoes')
+      .update({
+        valor: input.amount,
+        data: input.date,
+        descricao: normalizeText(input.description),
+        conta_origem_id: input.originAccountId,
+        conta_destino_id: input.destinationAccountId,
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (error) throw new Error('Erro ao atualizar transferência')
+  }
+}
 
 export async function deleteTransaction(id: string): Promise<void> {
   const { data: userData } = await supabase.auth.getUser()
