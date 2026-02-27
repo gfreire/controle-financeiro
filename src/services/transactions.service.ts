@@ -5,6 +5,7 @@ import {
 } from '@/domain/transaction'
 import { TimelineItem } from '@/domain/transaction'
 import Decimal from 'decimal.js'
+import { normalizeText } from '@/utils/normalize'
 
 export async function createTransaction(
   input: CreateTransactionInput
@@ -45,7 +46,7 @@ async function createIncome(
     tipo: 'ENTRADA',
     valor: input.amount,
     data: input.date,
-    descricao: input.description ?? null,
+    descricao: normalizeText(input.description),
     conta_destino_id: input.destinationAccountId,
     conta_origem_id: null,
     categoria_id: input.categoryId ?? null,
@@ -71,7 +72,7 @@ async function createCashExpense(
     tipo: 'SAIDA',
     valor: input.amount,
     data: input.date,
-    descricao: input.description ?? null,
+    descricao: normalizeText(input.description),
     conta_origem_id: input.originAccountId,
     conta_destino_id: null,
     categoria_id: input.categoryId ?? null,
@@ -97,7 +98,7 @@ async function createTransfer(
     tipo: 'TRANSFERENCIA',
     valor: input.amount,
     data: input.date,
-    descricao: input.description ?? null,
+    descricao: normalizeText(input.description),
     conta_origem_id: input.originAccountId,
     conta_destino_id: input.destinationAccountId,
     categoria_id: null,
@@ -168,7 +169,7 @@ async function createCardPurchase(
       .insert({
         conta_cartao_id: originAccountId,
         data_compra: date,
-        descricao: description ?? '',
+        descricao: normalizeText(description) ?? '',
         valor_total: amount,
         numero_parcelas: installments,
         categoria_id: categoryId ?? null,

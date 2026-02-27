@@ -8,6 +8,7 @@ import {
   validateCreateAccount,
   validateUpdateAccount,
 } from '@/domain/account'
+import { normalizeText } from '@/utils/normalize'
 
 /* =========================
    INTERNAL DB TYPE
@@ -205,13 +206,14 @@ export async function createAccount(
 
   const userId = await getUserId()
 
-  const { name, type, initialBalance, creditLimit } =
-    input
+  const { name, type, initialBalance, creditLimit } = input
+
+  const normalizedName = normalizeText(name)
 
   const { error } = await supabase
     .from('contas')
     .insert({
-      nome: name,
+      nome: normalizedName,
       tipo_conta: type,
       saldo_inicial:
         type === 'CARTAO_CREDITO'
@@ -239,10 +241,12 @@ export async function updateAccount(
 
   const { name, creditLimit } = input
 
+  const normalizedName = normalizeText(name)
+
   const { error } = await supabase
     .from('contas')
     .update({
-      nome: name,
+      nome: normalizedName,
       limite_total: creditLimit ?? null,
     })
     .eq('id', id)

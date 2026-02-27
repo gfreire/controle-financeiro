@@ -6,6 +6,7 @@ import {
   Subcategory,
   CategoryType,
 } from '@/domain/category'
+import { normalizeText } from '@/utils/normalize'
 
 /* =========================
    DB TYPES
@@ -85,9 +86,8 @@ export async function createCategory(
   name: string,
   type: CategoryType
 ): Promise<Category> {
-  const trimmed = name.trim()
-
-  if (trimmed.length < 2) {
+  const normalized = normalizeText(name)
+  if (!normalized || normalized.length < 2) {
     throw new Error('Nome da categoria inválido')
   }
 
@@ -104,7 +104,7 @@ export async function createCategory(
   const { data: existing, error: checkError } = await supabase
     .from('categorias')
     .select('id, user_id')
-    .ilike('nome', trimmed)
+    .ilike('nome', normalized)
     .eq('tipo_categoria', type)
 
   if (checkError) {
@@ -128,7 +128,7 @@ export async function createCategory(
   const { data, error } = await supabase
     .from('categorias')
     .insert({
-      nome: trimmed,
+      nome: normalized,
       tipo_categoria: type,
       user_id: userId,
     })
@@ -150,9 +150,9 @@ export async function createSubcategory(
   name: string,
   categoryId: string
 ): Promise<Subcategory> {
-  const trimmed = name.trim()
+  const normalized = normalizeText(name)
 
-  if (trimmed.length < 2) {
+  if (!normalized || normalized.length < 2) {
     throw new Error('Nome da subcategoria inválido')
   }
 
@@ -166,7 +166,7 @@ export async function createSubcategory(
   const { data, error } = await supabase
     .from('subcategorias')
     .insert({
-      nome: trimmed,
+      nome: normalized,
       categoria_id: categoryId,
       user_id: userId,
     })
@@ -284,9 +284,9 @@ export async function updateCategory(
   id: string,
   name: string
 ): Promise<void> {
-  const trimmed = name.trim()
+  const normalized = normalizeText(name)
 
-  if (trimmed.length < 2) {
+  if (!normalized || normalized.length < 2) {
     throw new Error('Nome inválido')
   }
 
@@ -314,7 +314,7 @@ export async function updateCategory(
 
   const { error } = await supabase
     .from('categorias')
-    .update({ nome: trimmed })
+    .update({ nome: normalized })
     .eq('id', id)
     .eq('user_id', userId)
 
@@ -331,9 +331,9 @@ export async function updateSubcategory(
   id: string,
   name: string
 ): Promise<void> {
-  const trimmed = name.trim()
+  const normalized = normalizeText(name)
 
-  if (trimmed.length < 2) {
+  if (!normalized || normalized.length < 2) {
     throw new Error('Nome inválido')
   }
 
@@ -363,7 +363,7 @@ export async function updateSubcategory(
 
   const { error } = await supabase
     .from('subcategorias')
-    .update({ nome: trimmed })
+    .update({ nome: normalized })
     .eq('id', id)
     .eq('user_id', userId)
 
