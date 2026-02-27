@@ -141,7 +141,7 @@ export default function CategoryForm({
           message.includes('already exists') ||
           message.includes('unique')
         ) {
-          setError('Categoria já existe')
+          setError('Categoria ou subcategoria já existe')
         } else {
           setError(err.message)
         }
