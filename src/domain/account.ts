@@ -95,15 +95,6 @@ export function validateCreateAccount(
 
   if (input.type === 'CONTA_CORRENTE') {
     if (
-      input.initialBalance === null ||
-      input.initialBalance === undefined
-    ) {
-      throw new Error(
-        'Saldo inicial é obrigatório'
-      )
-    }
-
-    if (
       input.creditLimit !== null &&
       input.creditLimit !== undefined
     ) {
