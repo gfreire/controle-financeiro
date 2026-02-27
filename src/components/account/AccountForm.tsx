@@ -42,26 +42,44 @@ export function AccountForm({ mode, initialData }: AccountFormProps) {
         return
       }
 
+      // ===== Numeric parsing only on submit =====
+      const parsedInitialBalance =
+        type !== 'CARTAO_CREDITO'
+          ? initialBalance === ''
+            ? 0
+            : Number(initialBalance)
+          : null
+
+      const parsedCreditLimit =
+        type === 'CARTAO_CREDITO'
+          ? creditLimit === ''
+            ? null
+            : Number(creditLimit)
+          : null
+
+      if (type !== 'CARTAO_CREDITO' && parsedInitialBalance !== null && isNaN(parsedInitialBalance)) {
+        setError('Saldo inicial inválido')
+        return
+      }
+
+      if (type === 'CARTAO_CREDITO') {
+        if (parsedCreditLimit === null || isNaN(parsedCreditLimit)) {
+          setError('Limite do cartão é obrigatório e deve ser válido')
+          return
+        }
+      }
+
       if (isEdit && initialData) {
         await updateAccount(initialData.id, {
           name: normalizedName,
-          creditLimit:
-            type === 'CARTAO_CREDITO'
-              ? Number(creditLimit)
-              : null,
+          creditLimit: parsedCreditLimit,
         })
       } else {
         await createAccount({
           name: normalizedName,
           type,
-          initialBalance:
-            type === 'CARTAO_CREDITO'
-              ? null
-              : Number(initialBalance),
-          creditLimit:
-            type === 'CARTAO_CREDITO'
-              ? Number(creditLimit)
-              : null,
+          initialBalance: parsedInitialBalance,
+          creditLimit: parsedCreditLimit,
         })
       }
 
