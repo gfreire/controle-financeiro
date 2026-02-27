@@ -28,6 +28,7 @@ export function AccountForm({ mode, initialData }: AccountFormProps) {
   )
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   async function handleSubmit() {
     try {
@@ -64,7 +65,11 @@ export function AccountForm({ mode, initialData }: AccountFormProps) {
         })
       }
 
-      router.push('/accounts')
+      setSuccess(true)
+
+      setTimeout(() => {
+        router.push('/accounts')
+      }, 1500)
     } catch (err) {
       setError(
         err instanceof Error
@@ -80,6 +85,14 @@ export function AccountForm({ mode, initialData }: AccountFormProps) {
 
   return (
     <>
+      {success && (
+        <div className="success-overlay">
+          <div className="success-box">
+            {isEdit ? 'Conta atualizada com sucesso' : 'Conta criada com sucesso'}
+          </div>
+        </div>
+      )}
+
       {error && <div className="error field">{error}</div>}
 
       <div className="field">
