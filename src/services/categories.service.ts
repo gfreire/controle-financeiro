@@ -53,9 +53,17 @@ function mapSubcategory(row: DBSubcategory): Subcategory {
 ========================= */
 
 export async function listCategories(): Promise<Category[]> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
   const { data, error } = await supabase
     .from('categorias')
     .select('id, nome, tipo_categoria, user_id')
+    .or(`user_id.is.null,user_id.eq.${userId}`)
     .order('nome')
 
   if (error) {
@@ -66,9 +74,17 @@ export async function listCategories(): Promise<Category[]> {
 }
 
 export async function listSubcategories(): Promise<Subcategory[]> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
   const { data, error } = await supabase
     .from('subcategorias')
     .select('id, nome, categoria_id, user_id')
+    .or(`user_id.is.null,user_id.eq.${userId}`)
     .order('nome')
 
   if (error) {
@@ -163,6 +179,25 @@ export async function createSubcategory(
     throw new Error('Usuário não autenticado')
   }
 
+  const { data: conflicts, error: conflictError } = await supabase
+    .from('subcategorias')
+    .select('id, user_id')
+    .ilike('nome', normalized)
+    .eq('categoria_id', categoryId)
+
+  if (conflictError) {
+    throw new Error('Erro ao validar subcategoria')
+  }
+
+  const duplicate = (conflicts ?? []).some(
+    (c: { id: string; user_id: string | null }) =>
+      c.user_id === null || c.user_id === userId
+  )
+
+  if (duplicate) {
+    throw new Error('Subcategoria já existe')
+  }
+
   const { data, error } = await supabase
     .from('subcategorias')
     .insert({
@@ -243,10 +278,18 @@ export async function createSubcategoryForExistingCategory(
 export async function getCategoryById(
   id: string
 ): Promise<Category> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
   const { data, error } = await supabase
     .from('categorias')
     .select('id, nome, tipo_categoria, user_id')
     .eq('id', id)
+    .or(`user_id.is.null,user_id.eq.${userId}`)
     .single()
 
   if (error || !data) {
@@ -263,10 +306,18 @@ export async function getCategoryById(
 export async function getSubcategoryById(
   id: string
 ): Promise<Subcategory> {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData.user?.id
+
+  if (!userId) {
+    throw new Error('Usuário não autenticado')
+  }
+
   const { data, error } = await supabase
     .from('subcategorias')
     .select('id, nome, categoria_id, user_id')
     .eq('id', id)
+    .or(`user_id.is.null,user_id.eq.${userId}`)
     .single()
 
   if (error || !data) {
@@ -499,6 +550,7 @@ export async function deleteCategory(
       subcategoria_id: newSubcategoryId ?? null,
     })
     .eq('categoria_id', categoryId)
+    .eq('user_id', userId)
 
   /* 2️⃣ Atualiza compras cartão */
   await supabase
@@ -508,6 +560,7 @@ export async function deleteCategory(
       subcategoria_id: newSubcategoryId ?? null,
     })
     .eq('categoria_id', categoryId)
+    .eq('user_id', userId)
 
   /* 3️⃣ Deleta subcategorias da categoria */
   await supabase
@@ -566,6 +619,7 @@ export async function deleteSubcategory(
         subcategoria_id: newSubcategoryId ?? null,
       })
       .eq('subcategoria_id', subcategoryId)
+      .eq('user_id', userId)
 
     await supabase
       .from('compras_cartao')
@@ -573,6 +627,7 @@ export async function deleteSubcategory(
         subcategoria_id: newSubcategoryId ?? null,
       })
       .eq('subcategoria_id', subcategoryId)
+      .eq('user_id', userId)
   }
 
   const { error } = await supabase

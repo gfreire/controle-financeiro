@@ -70,7 +70,7 @@ export async function listAccounts(): Promise<Account[]> {
 
   const { data: accountsData, error } = await supabase
     .from('contas')
-    .select('*')
+    .select('id,nome,tipo_conta,saldo_inicial,limite_total,ativa,created_at,user_id')
     .eq('ativa', true)
     .eq('user_id', userId)
     .order('nome')
@@ -186,10 +186,13 @@ export async function listAccounts(): Promise<Account[]> {
 export async function getAccountById(
   id: string
 ): Promise<Account> {
+  const userId = await getUserId()
+
   const { data, error } = await supabase
     .from('contas')
-    .select('*')
+    .select('id,nome,tipo_conta,saldo_inicial,limite_total,ativa,created_at,user_id')
     .eq('id', id)
+    .eq('user_id', userId)
     .single()
 
   if (error || !data) {
@@ -221,7 +224,7 @@ export async function createAccount(
           : initialBalance ?? 0,
       limite_total:
         type === 'CARTAO_CREDITO'
-          ? creditLimit!
+          ? creditLimit ?? 0
           : null,
       user_id: userId,
     })
@@ -356,19 +359,31 @@ export async function testAccountImpact(
 
   const { data: saidas } = await saidasQuery
 
-  const { data: transfSaida } = await supabase
+  let transfSaidaQuery = supabase
     .from('movimentacoes')
-    .select('valor')
+    .select('id, valor')
     .eq('conta_origem_id', account.id)
     .eq('user_id', userId)
     .eq('tipo', 'TRANSFERENCIA')
 
-  const { data: transfEntrada } = await supabase
+  if (excludeMovimentacaoId) {
+    transfSaidaQuery = transfSaidaQuery.neq('id', excludeMovimentacaoId)
+  }
+
+  const { data: transfSaida } = await transfSaidaQuery
+
+  let transfEntradaQuery = supabase
     .from('movimentacoes')
-    .select('valor')
+    .select('id, valor')
     .eq('conta_destino_id', account.id)
     .eq('user_id', userId)
     .eq('tipo', 'TRANSFERENCIA')
+
+  if (excludeMovimentacaoId) {
+    transfEntradaQuery = transfEntradaQuery.neq('id', excludeMovimentacaoId)
+  }
+
+  const { data: transfEntrada } = await transfEntradaQuery
 
   const totalEntradas = (entradas ?? []).reduce(
     (sum: Decimal, m: ValorRow) =>

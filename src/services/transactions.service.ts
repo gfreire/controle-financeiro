@@ -154,11 +154,7 @@ async function createCardPurchase(
     new Decimal(0)
   )
 
-  const diff = totalFromParcels
-    .minus(new Decimal(amount))
-    .abs()
-
-  if (diff.greaterThan(new Decimal(0.01))) {
+  if (!totalFromParcels.equals(new Decimal(amount))) {
     throw new Error(
       'Soma das parcelas diferente do valor total'
     )
@@ -268,6 +264,7 @@ export async function listTimeline(): Promise<TimelineItem[]> {
   const { data, error } = await supabase
     .from('vw_timeline')
     .select('*')
+    .eq('user_id', userId)
     .order('date', { ascending: false })
 
   if (error) {
