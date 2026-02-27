@@ -5,15 +5,7 @@ import Link from 'next/link'
 import { listAccounts, disableAccount } from '@/services/accounts.service'
 import { Account } from '@/domain/account'
 import { accountTypeBadges } from '@/utils/accountTypeUI'
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+import { formatCurrency } from '@/utils/formatCurrency'
 
 const accountTypeOrder: Record<string, number> = {
   DINHEIRO: 1,
