@@ -1,27 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import {
-  getCategoryById,
-  updateCategory,
-} from '@/services/categories.service'
+import { getCategoryById } from '@/services/categories.service'
 import { Category } from '@/domain/category'
+import CategoryForm from '@/components/categories/CategoryForm'
 
 export default function EditCategoryPage() {
-  const router = useRouter()
   const params = useParams()
   const id = params?.id as string
 
   const [category, setCategory] =
     useState<Category | null>(null)
-
-  const [name, setName] = useState('')
-  const [error, setError] =
-    useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -29,55 +20,10 @@ export default function EditCategoryPage() {
 
       const cat = await getCategoryById(id)
       setCategory(cat)
-      setName(cat.name)
     }
 
     load()
   }, [id])
-
-  async function handleSubmit(
-    e: React.FormEvent
-  ) {
-    e.preventDefault()
-    setError(null)
-
-    if (!category) return
-
-    try {
-      setLoading(true)
-
-      const trimmed = name.trim()
-
-      if (trimmed.length < 2) {
-        throw new Error(
-          'Nome deve ter pelo menos 2 caracteres'
-        )
-      }
-
-      if (category.isDefault) {
-        throw new Error(
-          'Categorias padrão não podem ser editadas'
-        )
-      }
-
-      await updateCategory(category.id, trimmed)
-
-      setSuccess(true)
-
-      setTimeout(() => {
-        setSuccess(false)
-        router.push('/categories')
-      }, 1500)
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Erro ao atualizar')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (!category) {
     return (
@@ -89,14 +35,6 @@ export default function EditCategoryPage() {
 
   return (
     <main className="container">
-      {success && (
-        <div className="success-overlay">
-          <div className="success-box">
-            Atualizado com sucesso
-          </div>
-        </div>
-      )}
-
       <Link href="/categories" className="link">
         ← Voltar
       </Link>
@@ -105,37 +43,10 @@ export default function EditCategoryPage() {
         Editar categoria
       </h1>
 
-      <form onSubmit={handleSubmit}>
-        <div className="field">
-          <label>Nome</label>
-          <input
-            className="input"
-            value={name}
-            onChange={(e) =>
-              setName(e.target.value)
-            }
-            disabled={category.isDefault}
-          />
-        </div>
-
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-
-        {!category.isDefault && (
-          <button
-            type="submit"
-            className="button"
-            disabled={loading}
-          >
-            {loading
-              ? 'Salvando...'
-              : 'Salvar alterações'}
-          </button>
-        )}
-      </form>
+      <CategoryForm
+        mode="edit"
+        initialData={category}
+      />
     </main>
   )
 }

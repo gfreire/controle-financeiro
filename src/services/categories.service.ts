@@ -297,19 +297,40 @@ export async function updateCategory(
     throw new Error('Usuário não autenticado')
   }
 
-  // Impede edição de categoria default
-  const { data: existing } = await supabase
+  // Busca categoria existente e impede edição de categoria default
+  const { data: existingCategory } = await supabase
     .from('categorias')
-    .select('user_id')
+    .select('user_id, tipo_categoria')
     .eq('id', id)
     .single()
 
-  if (!existing) {
+  if (!existingCategory) {
     throw new Error('Categoria não encontrada')
   }
 
-  if (existing.user_id === null) {
+  if (existingCategory.user_id === null) {
     throw new Error('Categoria padrão não pode ser editada')
+  }
+
+  // Verifica conflito com outras categorias (default ou do próprio usuário)
+  const { data: conflicts, error: conflictError } = await supabase
+    .from('categorias')
+    .select('id, user_id')
+    .ilike('nome', normalized)
+    .eq('tipo_categoria', existingCategory.tipo_categoria)
+
+  if (conflictError) {
+    throw new Error('Erro ao validar categoria')
+  }
+
+  const duplicate = (conflicts ?? []).some(
+    (c: { id: string; user_id: string | null }) =>
+      c.id !== id &&
+      (c.user_id === null || c.user_id === userId)
+  )
+
+  if (duplicate) {
+    throw new Error('Categoria já existe')
   }
 
   const { error } = await supabase
@@ -359,6 +380,38 @@ export async function updateSubcategory(
     throw new Error(
       'Subcategoria padrão não pode ser editada'
     )
+  }
+
+  // Busca categoria da subcategoria
+  const { data: subData } = await supabase
+    .from('subcategorias')
+    .select('categoria_id')
+    .eq('id', id)
+    .single()
+
+  if (!subData) {
+    throw new Error('Subcategoria não encontrada')
+  }
+
+  // Verifica conflito dentro da mesma categoria
+  const { data: conflicts, error: conflictError } = await supabase
+    .from('subcategorias')
+    .select('id, user_id')
+    .ilike('nome', normalized)
+    .eq('categoria_id', subData.categoria_id)
+
+  if (conflictError) {
+    throw new Error('Erro ao validar subcategoria')
+  }
+
+  const duplicate = (conflicts ?? []).some(
+    (c: { id: string; user_id: string | null }) =>
+      c.id !== id &&
+      (c.user_id === null || c.user_id === userId)
+  )
+
+  if (duplicate) {
+    throw new Error('Subcategoria já existe')
   }
 
   const { error } = await supabase
