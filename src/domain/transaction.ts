@@ -148,10 +148,6 @@ export function validateCreateTransaction(
     throw new Error('Data é obrigatória')
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-    throw new Error('Data deve estar no formato YYYY-MM-DD')
-  }
-
   if (input.amount <= 0) {
     throw new Error('Valor deve ser maior que zero')
   }
@@ -188,9 +184,7 @@ export function validateCreateTransaction(
         0
       )
 
-      const diff = Math.abs(totalParcelas - input.amount)
-
-      if (diff > 0.01) {
+      if (totalParcelas !== input.amount) {
         throw new Error('Soma das parcelas diferente do valor total')
       }
     }
