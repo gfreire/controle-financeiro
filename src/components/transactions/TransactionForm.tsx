@@ -165,12 +165,20 @@ export default function TransactionForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!paymentMethod || !accountId || !amount) return
+    if (!accountId || !amount) return
+
+    if (kind === 'SAIDA' && !paymentMethod) return
 
     setLimitError(null)
 
     const numericAmount = Number(amount)
-    const impact = await testAccountImpact(accountId, numericAmount)
+    const impact = await testAccountImpact(
+      accountId,
+      numericAmount,
+      isEdit && transactionId
+        ? { excludeMovimentacaoId: transactionId }
+        : undefined
+    )
 
     if (kind === 'SAIDA') {
       if (impact.type === 'DINHEIRO' && impact.willExceed) {
@@ -570,7 +578,11 @@ export default function TransactionForm({
       <button
         type="submit"
         className="button"
-        disabled={!paymentMethod || !accountId || !amount}
+        disabled={
+          !accountId ||
+          !amount ||
+          (kind === 'SAIDA' && !paymentMethod)
+        }
       >
         {isEdit ? 'Atualizar' : 'Salvar'}
       </button>
