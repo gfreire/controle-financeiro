@@ -72,14 +72,34 @@ export function validateCreateAccount(
     }
   }
 
-  if (input.type !== 'CARTAO_CREDITO') {
+  if (input.type === 'DINHEIRO') {
     if (
       input.initialBalance === null ||
       input.initialBalance === undefined ||
       input.initialBalance < 0
     ) {
       throw new Error(
-        'Saldo inicial deve ser zero ou positivo'
+        'Conta em dinheiro não pode iniciar com saldo negativo'
+      )
+    }
+
+    if (
+      input.creditLimit !== null &&
+      input.creditLimit !== undefined
+    ) {
+      throw new Error(
+        'Somente cartão de crédito pode ter limite'
+      )
+    }
+  }
+
+  if (input.type === 'CONTA_CORRENTE') {
+    if (
+      input.initialBalance === null ||
+      input.initialBalance === undefined
+    ) {
+      throw new Error(
+        'Saldo inicial é obrigatório'
       )
     }
 
