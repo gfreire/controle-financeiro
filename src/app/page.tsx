@@ -35,6 +35,15 @@ export default function DashboardPage() {
           </div>
         </Link>
 
+        <Link href="/debts" className="card">
+          <div className="card-main">
+            <strong>Dívidas</strong>
+            <span className="muted">
+              Gerenciar contas a pagar e a receber
+            </span>
+          </div>
+        </Link>
+
       </div>
     </main>
   )
