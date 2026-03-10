@@ -524,6 +524,18 @@ click category in chart
 
 All database operations must be implemented inside services.
 
+Service responsibilities:
+
+dashboard.service → financial analytics and dashboard aggregations  
+
+transactions.service → transaction creation, editing, deletion and listing  
+
+accounts.service → account management and configuration  
+
+cards.service → credit card purchases, installments and card payments  
+
+reservoirs.service → reservoir logic and reservoir transactions
+
 Example file
 
 dashboard.service.ts
@@ -605,6 +617,13 @@ balance
 
 Reservoir and debts may appear in separate informational lists but must not affect dashboard calculations.
 
+Credit card payments are stored as transactions with:
+
+type = CREDIT_CARD_PAYMENT
+
+These transactions represent paying the credit card bill and therefore
+reduce the balance of the account used for the payment.
+
 ---
 
 # Analytics Data Sources
@@ -636,6 +655,29 @@ May
 NOT February.
 
 The table `card_purchases` represents purchase metadata, but **financial analytics must rely on `card_installments`**.
+
+---
+
+# Analytics Aggregation Model
+
+Financial analytics combine two primary sources of financial events:
+
+transactions  
+card_installments  
+
+Both represent real financial effects on the user's finances.
+
+Analytics queries may aggregate or UNION these sources depending on
+the chart or report being generated.
+
+Example cases:
+
+Income and expense evolution → transactions + card_installments  
+Category distribution → transactions + card_installments  
+Monthly totals → aggregated financial events per competence month  
+
+The `card_purchases` table should not be used directly for analytics
+because purchases may span multiple competence months.
 
 ---
 

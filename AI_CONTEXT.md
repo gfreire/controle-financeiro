@@ -461,8 +461,6 @@ card payments
 
 These values correspond to real financial events that affect account balances and financial reports.
 
-These must be considered real financial events.
-
 The following do NOT affect totals:
 
 ```

@@ -90,6 +90,16 @@ page
  → component
 ```
 
+Server Actions must follow the same rule.
+
+Correct pattern:
+
+Server Action  
+ → service  
+ → Supabase query  
+
+Server Actions must never access Supabase directly.
+
 Never write database queries inside:
 
 - React components
@@ -202,7 +212,7 @@ type DashboardFilters = {
   accounts?: string[]
   categories?: string[]
   subcategories?: string[]
-  transactionType?: "income" | "expense"
+  transactionType?: "INCOME" | "EXPENSE"
 }
 ```
 
