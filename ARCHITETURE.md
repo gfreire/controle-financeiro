@@ -358,7 +358,7 @@ periodEnd
 accounts[]  
 categories[]  
 subcategories[]  
-transactionType  
+transactionType ("INCOME" | "EXPENSE")
 
 These filters are passed to services.
 
@@ -499,7 +499,7 @@ periodEnd
 accounts  
 categories  
 subcategories  
-transactionType  
+transactionType ("INCOME" | "EXPENSE")
 
 Table fields
 
